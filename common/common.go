@@ -3,9 +3,9 @@ package common
 import (
 	"github.com/sunthewhat/secure-docs-api/type/shared"
 	"github.com/sunthewhat/secure-docs-api/type/shared/query"
-	"gorm.io/gorm"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var Config *shared.Config
-var Database *gorm.DB
-var Query *query.Query
+var Gorm *query.Query
+var Mongo *mongo.Database

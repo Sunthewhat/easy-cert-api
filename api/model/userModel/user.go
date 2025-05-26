@@ -10,7 +10,7 @@ import (
 )
 
 func GetByUsername(username string) (*model.User, error) {
-	user, queryErr := common.Query.User.Where(common.Query.User.Username.Eq(username)).First()
+	user, queryErr := common.Gorm.User.Where(common.Gorm.User.Username.Eq(username)).First()
 
 	if queryErr != nil {
 		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
@@ -30,7 +30,7 @@ func CreateNewUser(username string, password string, firstname string, lastname 
 		Password:  password,
 	}
 
-	createErr := common.Query.User.Create(user)
+	createErr := common.Gorm.User.Create(user)
 
 	if createErr != nil {
 		return nil, gut.Err(false, createErr.Error())

@@ -26,7 +26,7 @@ func Push_db() {
 
 	dialector := postgres.New(
 		postgres.Config{
-			DSN: *common.Config.Db,
+			DSN: *common.Config.Postgres,
 		},
 	)
 
