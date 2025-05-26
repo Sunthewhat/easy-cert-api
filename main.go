@@ -6,6 +6,7 @@ import (
 	"github.com/sunthewhat/secure-docs-api/api"
 	"github.com/sunthewhat/secure-docs-api/common/config"
 	"github.com/sunthewhat/secure-docs-api/common/gorm"
+	"github.com/sunthewhat/secure-docs-api/common/mongo"
 )
 
 func main() {
@@ -27,5 +28,6 @@ func main() {
 	}
 
 	gorm.InitGorm()
+	mongo.InitMongo()
 	api.InitFiber()
 }

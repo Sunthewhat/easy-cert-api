@@ -1,6 +1,7 @@
 package gorm
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -28,7 +29,7 @@ func InitGorm() {
 	// Config GORM Connector
 	connector := postgres.New(
 		postgres.Config{
-			DSN:                  *common.Config.Db,
+			DSN:                  *common.Config.Postgres,
 			PreferSimpleProtocol: true,
 		},
 	)
@@ -42,6 +43,7 @@ func InitGorm() {
 		gut.Fatal("Failed to connect to database", connectionErr)
 	}
 
-	common.Database = db
-	common.Query = query.Use(db)
+	fmt.Println("GORM Connected!")
+
+	common.Gorm = query.Use(db)
 }

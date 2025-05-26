@@ -27,7 +27,7 @@ func Pull_db() {
 	// Config GORM Connector
 	connector := postgres.New(
 		postgres.Config{
-			DSN:                  *common.Config.Db,
+			DSN:                  *common.Config.Postgres,
 			PreferSimpleProtocol: true,
 		},
 	)
