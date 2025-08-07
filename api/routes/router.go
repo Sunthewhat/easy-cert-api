@@ -1,17 +1,89 @@
 package routes
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
-	auth_controller "github.com/sunthewhat/secure-docs-api/api/controllers/auth"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/sunthewhat/secure-docs-api/api/handler"
+	"github.com/sunthewhat/secure-docs-api/common"
 )
 
-func Init(router fiber.Router) {
-	api := router.Group("api")
+// Init initializes all routes and middleware
+func Init(app *fiber.App) {
+	// Global middleware
+	app.Use(recover.New())
+	app.Use(logger.New())
 
-	publicGroup := api.Group("public")
+	// Configure CORS with origins from config
+	var allowedOrigins string
+	if len(common.Config.Cors) > 0 {
+		// Convert []*string to []string
+		origins := make([]string, len(common.Config.Cors))
+		for i, origin := range common.Config.Cors {
+			if origin != nil {
+				origins[i] = *origin
+			}
+		}
+		allowedOrigins = strings.Join(origins, ",")
+	} else {
+		allowedOrigins = "*" // Fallback to wildcard if no config
+	}
 
-	authGroup := publicGroup.Group("auth")
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: allowedOrigins,
+		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
+		AllowHeaders: "Origin,Content-Type,Accept,Authorization",
+	}))
 
-	authGroup.Post("register", auth_controller.Register)
-	authGroup.Post("login", auth_controller.Login)
+	// API routes
+	api := app.Group("/api")
+
+	// Health check endpoint
+	api.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status":  "ok",
+			"message": "IT Ticket Core API is running",
+		})
+	})
+
+	// Handle OPTIONS requests (CORS preflight)
+	api.Options("/health", func(c *fiber.Ctx) error {
+		fmt.Printf("Health Check OPTIONS! Method: %s, Path: %s, User-Agent: %s\n",
+			c.Method(), c.Path(), c.Get("User-Agent"))
+		return c.SendStatus(200)
+	})
+
+	// Public routes
+	SetupPublicRoutes(api)
+
+	// API versioning
+	v1 := api.Group("/v1")
+
+	// Setup all route modules
+	SetupAuthRoutes(v1)
+
+	// Handle favicon requests to prevent 404s
+	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
+		return c.SendStatus(204) // No Content
+	})
+
+	// 404 handler
+	app.Use(handler.HandleNotFound)
+}
+
+// SetupPublicRoutes configures public routes
+func SetupPublicRoutes(router fiber.Router) {
+	publicGroup := router.Group("/public")
+
+	// Public endpoints for health checks, documentation, etc.
+	publicGroup.Get("/status", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status":    "healthy",
+			"timestamp": fiber.Map{},
+		})
+	})
 }

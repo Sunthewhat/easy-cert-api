@@ -16,21 +16,21 @@ func Register(c *fiber.Ctx) error {
 
 	// Parse Body to struct
 	if err := c.BodyParser(body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(response.Error("Failed to parse body"))
+		return response.SendError(c, "Failed to parse body")
 	}
 
 	// Validate Body structure
 	if validateErr := gut.Validate(body); validateErr != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(response.Error("Missing required fields"))
+		return response.SendFailed(c, "Missing required fields")
 	}
 
 	// Check if username already existed
 	if dupUser, err := userModel.GetByUsername(body.Username); dupUser != nil || err != nil {
 		if dupUser != nil {
-			return c.Status(fiber.StatusConflict).JSON(response.Error("User already Existed"))
+			return response.SendFailed(c, "User already existed")
 		}
 		fmt.Println(err.Error())
-		return c.Status(fiber.StatusInternalServerError).JSON(response.Error(err.Error()))
+		return response.SendInternalError(c, err)
 	}
 
 	// Hasing Password
@@ -38,18 +38,18 @@ func Register(c *fiber.Ctx) error {
 
 	if hashErr != nil {
 		fmt.Println(hashErr.Error())
-		return c.Status(fiber.StatusInternalServerError).JSON(response.Error("Password hashing failed"))
+		return response.SendError(c, "Password hashing failed")
 	}
 
 	createdUser, createErr := userModel.CreateNewUser(body.Username, hashedPassword, body.Firstname, body.Lastname)
 
 	if createErr != nil {
 		fmt.Println(createErr.Error())
-		return c.Status(fiber.StatusInternalServerError).JSON(response.Error("Failed to create user"))
+		return response.SendError(c, "Failed to create user")
 	}
 
-	return c.Status(fiber.StatusOK).JSON(response.Success("User Registered", fiber.Map{
+	return response.SendSuccess(c, "User Registered", fiber.Map{
 		"id":       createdUser.ID,
 		"username": createdUser.Username,
-	}))
+	})
 }

@@ -13,34 +13,32 @@ func Login(c *fiber.Ctx) error {
 	body := new(payload.LoginPayload)
 
 	if err := c.BodyParser(body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(response.Error(response.Error("Failed to parse body")))
+		return response.SendError(c, "Failed to parse body")
 	}
 
 	if validateErr := gut.Validate(body); validateErr != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(response.Error("Missing required fields"))
+		return response.SendFailed(c, "Missing required fields")
 	}
 
 	user, queryErr := userModel.GetByUsername(body.Username)
 
 	if user == nil {
 		if queryErr != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(response.Error(queryErr.Error()))
+			return response.SendInternalError(c, queryErr)
 		} else {
-			return c.Status(fiber.StatusBadRequest).JSON(response.Error("User not found"))
+			return response.SendFailed(c, "User not found")
 		}
 	}
 
 	if isPasswordMatch := util.CheckPassword(body.Password, user.Password); !isPasswordMatch {
-		return c.Status(fiber.StatusBadRequest).JSON(response.Error("Incorrect Password"))
+		return response.SendFailed(c, "Incorrect Password")
 	}
 
 	authToken, err := util.GenerateAuthToken(int(user.ID))
 
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(response.Error("Failed to generate JWT token"))
+		return response.SendError(c, "Failed to generate JWT Token")
 	}
 
-	return c.Status(fiber.StatusOK).JSON(response.Success("Login Successfully", fiber.Map{
-		"token": authToken,
-	}))
+	return response.SendSuccess(c, "Login Successfully", fiber.Map{"token": authToken})
 }
