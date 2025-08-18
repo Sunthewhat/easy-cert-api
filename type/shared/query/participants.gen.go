@@ -28,7 +28,7 @@ func newParticipant(db *gorm.DB, opts ...gen.DOOption) participant {
 	tableName := _participant.participantDo.TableName()
 	_participant.ALL = field.NewAsterisk(tableName)
 	_participant.ID = field.NewString(tableName, "id")
-	_participant.CertificateID = field.NewInt64(tableName, "certificate_id")
+	_participant.CertificateID = field.NewString(tableName, "certificate_id")
 	_participant.Isrevoke = field.NewBool(tableName, "isrevoke")
 	_participant.CreatedAt = field.NewTime(tableName, "created_at")
 	_participant.UpdatedAt = field.NewTime(tableName, "updated_at")
@@ -43,7 +43,7 @@ type participant struct {
 
 	ALL           field.Asterisk
 	ID            field.String
-	CertificateID field.Int64
+	CertificateID field.String
 	Isrevoke      field.Bool
 	CreatedAt     field.Time
 	UpdatedAt     field.Time
@@ -64,7 +64,7 @@ func (p participant) As(alias string) *participant {
 func (p *participant) updateTableName(table string) *participant {
 	p.ALL = field.NewAsterisk(table)
 	p.ID = field.NewString(table, "id")
-	p.CertificateID = field.NewInt64(table, "certificate_id")
+	p.CertificateID = field.NewString(table, "certificate_id")
 	p.Isrevoke = field.NewBool(table, "isrevoke")
 	p.CreatedAt = field.NewTime(table, "created_at")
 	p.UpdatedAt = field.NewTime(table, "updated_at")

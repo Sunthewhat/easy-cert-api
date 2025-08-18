@@ -8,7 +8,7 @@ import (
 	"github.com/sunthewhat/secure-docs-api/type/shared"
 )
 
-func GenerateAuthToken(id int) (string, error) {
+func GenerateAuthToken(id string) (string, error) {
 	expirationTime := time.Now().Add(time.Hour * 24 * 2) // 2 days
 
 	claims := &shared.UserClaims{

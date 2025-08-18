@@ -12,10 +12,10 @@ const TableNameCertificate = "certificates"
 
 // Certificate mapped from table <certificates>
 type Certificate struct {
-	ID        int64     `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	ID        string    `gorm:"column:id;primaryKey;default:gen_random_uuid()" json:"id"`
 	Name      string    `gorm:"column:name;not null" json:"name"`
 	Design    string    `gorm:"column:design;not null" json:"design"`
-	UserID    int64     `gorm:"column:user_id;not null" json:"user_id"`
+	UserID    string    `gorm:"column:user_id;not null" json:"user_id"`
 	CreatedAt time.Time `gorm:"column:created_at;not null;default:now()" json:"created_at"`
 	UpdatedAt time.Time `gorm:"column:updated_at;not null;default:now()" json:"updated_at"`
 }

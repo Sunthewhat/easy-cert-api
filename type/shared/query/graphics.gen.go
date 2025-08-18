@@ -27,7 +27,7 @@ func newGraphic(db *gorm.DB, opts ...gen.DOOption) graphic {
 
 	tableName := _graphic.graphicDo.TableName()
 	_graphic.ALL = field.NewAsterisk(tableName)
-	_graphic.ID = field.NewInt64(tableName, "id")
+	_graphic.ID = field.NewString(tableName, "id")
 	_graphic.Name = field.NewString(tableName, "name")
 	_graphic.SvgContent = field.NewString(tableName, "svg_content")
 	_graphic.CreatedAt = field.NewTime(tableName, "created_at")
@@ -42,7 +42,7 @@ type graphic struct {
 	graphicDo
 
 	ALL        field.Asterisk
-	ID         field.Int64
+	ID         field.String
 	Name       field.String
 	SvgContent field.String
 	CreatedAt  field.Time
@@ -63,7 +63,7 @@ func (g graphic) As(alias string) *graphic {
 
 func (g *graphic) updateTableName(table string) *graphic {
 	g.ALL = field.NewAsterisk(table)
-	g.ID = field.NewInt64(table, "id")
+	g.ID = field.NewString(table, "id")
 	g.Name = field.NewString(table, "name")
 	g.SvgContent = field.NewString(table, "svg_content")
 	g.CreatedAt = field.NewTime(table, "created_at")

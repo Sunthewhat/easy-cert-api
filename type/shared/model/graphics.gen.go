@@ -12,7 +12,7 @@ const TableNameGraphic = "graphics"
 
 // Graphic mapped from table <graphics>
 type Graphic struct {
-	ID         int64     `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	ID         string    `gorm:"column:id;primaryKey;default:gen_random_uuid()" json:"id"`
 	Name       string    `gorm:"column:name;not null" json:"name"`
 	SvgContent string    `gorm:"column:svg_content;not null" json:"svg_content"`
 	CreatedAt  time.Time `gorm:"column:created_at;not null;default:now()" json:"created_at"`

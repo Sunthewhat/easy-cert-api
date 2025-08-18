@@ -34,7 +34,7 @@ func Login(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Incorrect Password")
 	}
 
-	authToken, err := util.GenerateAuthToken(int(user.ID))
+	authToken, err := util.GenerateAuthToken(user.ID)
 
 	if err != nil {
 		return response.SendError(c, "Failed to generate JWT Token")

@@ -13,7 +13,7 @@ const TableNameParticipant = "participants"
 // Participant mapped from table <participants>
 type Participant struct {
 	ID            string    `gorm:"column:id;primaryKey;default:gen_random_uuid()" json:"id"`
-	CertificateID int64     `gorm:"column:certificate_id;not null" json:"certificate_id"`
+	CertificateID string    `gorm:"column:certificate_id;not null" json:"certificate_id"`
 	Isrevoke      bool      `gorm:"column:isrevoke;not null" json:"isrevoke"`
 	CreatedAt     time.Time `gorm:"column:created_at;not null;default:now()" json:"created_at"`
 	UpdatedAt     time.Time `gorm:"column:updated_at;not null;default:now()" json:"updated_at"`
