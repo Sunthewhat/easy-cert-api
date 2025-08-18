@@ -2,7 +2,7 @@ package mongo
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/bsthun/gut"
@@ -29,7 +29,7 @@ func InitMongo() {
 		gut.Fatal("Failed to ping MongoDB", err)
 	}
 
-	fmt.Println("MongoDB Connected!")
+	slog.Info("Mongo Connected!")
 
 	common.Mongo = client.Database(*common.Config.MongoDatabase)
 

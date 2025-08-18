@@ -1,8 +1,6 @@
 package auth_controller
 
 import (
-	"fmt"
-
 	"github.com/bsthun/gut"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/secure-docs-api/api/model/userModel"
@@ -29,7 +27,6 @@ func Register(c *fiber.Ctx) error {
 		if dupUser != nil {
 			return response.SendFailed(c, "User already existed")
 		}
-		fmt.Println(err.Error())
 		return response.SendInternalError(c, err)
 	}
 
@@ -37,14 +34,12 @@ func Register(c *fiber.Ctx) error {
 	hashedPassword, hashErr := util.HashPassword(body.Password)
 
 	if hashErr != nil {
-		fmt.Println(hashErr.Error())
 		return response.SendError(c, "Password hashing failed")
 	}
 
 	createdUser, createErr := userModel.CreateNewUser(body.Username, hashedPassword, body.Firstname, body.Lastname)
 
 	if createErr != nil {
-		fmt.Println(createErr.Error())
 		return response.SendError(c, "Failed to create user")
 	}
 

@@ -1,8 +1,8 @@
 package gorm
 
 import (
-	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -43,7 +43,7 @@ func InitGorm() {
 		gut.Fatal("Failed to connect to database", connectionErr)
 	}
 
-	fmt.Println("GORM Connected!")
+	slog.Info("GORM Connected!")
 
 	common.Gorm = query.Use(db)
 }

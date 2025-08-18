@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -52,8 +53,8 @@ func Init(app *fiber.App) {
 
 	// Handle OPTIONS requests (CORS preflight)
 	api.Options("/health", func(c *fiber.Ctx) error {
-		fmt.Printf("Health Check OPTIONS! Method: %s, Path: %s, User-Agent: %s\n",
-			c.Method(), c.Path(), c.Get("User-Agent"))
+		slog.Info(fmt.Sprintf("Health Check OPTIONS! Method: %s, Path: %s, User-Agent: %s\n",
+			c.Method(), c.Path(), c.Get("User-Agent")))
 		return c.SendStatus(200)
 	})
 

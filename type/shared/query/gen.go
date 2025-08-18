@@ -17,23 +17,32 @@ import (
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:   db,
-		User: newUser(db, opts...),
+		db:          db,
+		Certificate: newCertificate(db, opts...),
+		Graphic:     newGraphic(db, opts...),
+		Participant: newParticipant(db, opts...),
+		User:        newUser(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	User user
+	Certificate certificate
+	Graphic     graphic
+	Participant participant
+	User        user
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:   db,
-		User: q.User.clone(db),
+		db:          db,
+		Certificate: q.Certificate.clone(db),
+		Graphic:     q.Graphic.clone(db),
+		Participant: q.Participant.clone(db),
+		User:        q.User.clone(db),
 	}
 }
 
@@ -47,18 +56,27 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:   db,
-		User: q.User.replaceDB(db),
+		db:          db,
+		Certificate: q.Certificate.replaceDB(db),
+		Graphic:     q.Graphic.replaceDB(db),
+		Participant: q.Participant.replaceDB(db),
+		User:        q.User.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	User *userDo
+	Certificate *certificateDo
+	Graphic     *graphicDo
+	Participant *participantDo
+	User        *userDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		User: q.User.WithContext(ctx),
+		Certificate: q.Certificate.WithContext(ctx),
+		Graphic:     q.Graphic.WithContext(ctx),
+		Participant: q.Participant.WithContext(ctx),
+		User:        q.User.WithContext(ctx),
 	}
 }
 
