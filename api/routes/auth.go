@@ -10,4 +10,5 @@ func SetupAuthRoutes(router fiber.Router) {
 
 	authGroup.Post("login", auth_controller.Login)
 	authGroup.Post("register", auth_controller.Register)
+	authGroup.Get("verify", auth_controller.Verify)
 }
