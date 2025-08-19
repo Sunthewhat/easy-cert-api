@@ -9,4 +9,5 @@ func SetupCertificateRoutes(router fiber.Router) {
 	certificateGroup := router.Group("certificate")
 
 	certificateGroup.Get("", certificate_controller.GetAll)
+	certificateGroup.Delete(":certId", certificate_controller.Delete)
 }
