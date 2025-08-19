@@ -2,6 +2,7 @@ package gorm
 
 import (
 	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -34,7 +35,8 @@ func Push_db() {
 	})
 
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("Failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 
 	if err := db.AutoMigrate(
@@ -43,6 +45,9 @@ func Push_db() {
 		new(model.Participant),
 		new(model.Graphic),
 	); err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
+		slog.Error("Failed to migrate database", "error", err)
+		os.Exit(1)
 	}
+
+	slog.Info("Database migration completed successfully")
 }

@@ -2,6 +2,7 @@ package gorm
 
 import (
 	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -37,7 +38,8 @@ func Pull_db() {
 	})
 
 	if connectionErr != nil {
-		log.Fatalf("Failed to connect to database: %v", connectionErr)
+		slog.Error("Failed to connect to database", "error", connectionErr)
+		os.Exit(1)
 	}
 
 	g := gen.NewGenerator(
@@ -52,4 +54,6 @@ func Pull_db() {
 	g.ApplyBasic(g.GenerateAllTable()...)
 
 	g.Execute()
+
+	slog.Info("Database models generated successfully")
 }

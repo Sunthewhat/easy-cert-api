@@ -39,7 +39,8 @@ func InitGorm() {
 	})
 
 	if connectionErr != nil {
-		log.Fatalf("Failed to connect to database: %v", connectionErr)
+		slog.Error("Failed to connect to database", "error", connectionErr)
+		os.Exit(1)
 	}
 
 	slog.Info("GORM Connected!")

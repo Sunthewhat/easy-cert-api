@@ -38,11 +38,13 @@ func Update(c *fiber.Ctx) error {
 	updatedCert, updateErr := certificatemodel.Update(id, body.Name, body.Design)
 	if updateErr != nil {
 		if updateErr.Error() == "certificate not found" {
+			slog.Warn("Certificate Update attempt with non-existent ID", "cert_id", id)
 			return response.SendFailed(c, "Certificate not found")
 		}
-		slog.Error("Certificate Update controller", "error", updateErr)
+		slog.Error("Certificate Update controller failed", "error", updateErr, "cert_id", id)
 		return response.SendInternalError(c, updateErr)
 	}
 
+	slog.Info("Certificate Update successful", "cert_id", id, "cert_name", updatedCert.Name)
 	return response.SendSuccess(c, "Certificate updated successfully", updatedCert)
 }

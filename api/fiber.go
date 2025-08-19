@@ -1,7 +1,8 @@
 package api
 
 import (
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -29,9 +30,11 @@ func InitFiber() {
 
 	app.Use(handler.HandleNotFound)
 
+	slog.Info("Starting server", "port", *common.Config.Port)
 	err := app.Listen(*common.Config.Port)
 
 	if err != nil {
-		log.Fatal("Failed to start server ", err)
+		slog.Error("Failed to start server", "error", err)
+		os.Exit(1)
 	}
 }

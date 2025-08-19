@@ -2,8 +2,8 @@ package mongo
 
 import (
 	"context"
-	"log"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/sunthewhat/easy-cert-api/common"
@@ -20,13 +20,15 @@ func InitMongo() {
 	client, err := mongo.Connect(ctx, clientOptions)
 
 	if err != nil {
-		log.Fatalf("Failed to connect to MongoDB: %v", err)
+		slog.Error("Failed to connect to MongoDB", "error", err)
+		os.Exit(1)
 	}
 
 	err = client.Ping(ctx, nil)
 
 	if err != nil {
-		log.Fatalf("Failed to ping MongoDB: %v", err)
+		slog.Error("Failed to ping MongoDB", "error", err)
+		os.Exit(1)
 	}
 
 	slog.Info("Mongo Connected!")

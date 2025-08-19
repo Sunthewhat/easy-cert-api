@@ -2,7 +2,7 @@ package config
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/sunthewhat/easy-cert-api/common"
@@ -16,16 +16,21 @@ func LoadConfig() {
 	yml, readErr := os.ReadFile("config.yml")
 
 	if readErr != nil {
-		log.Fatalf("Failed to read config.yml: %v", readErr)
+		slog.Error("Failed to read config.yml", "error", readErr)
+		os.Exit(1)
 	}
 
 	if unmarshalErr := yaml.Unmarshal(yml, config); unmarshalErr != nil {
-		log.Fatalf("Failed to unmarshal config.yml: %v", unmarshalErr)
+		slog.Error("Failed to unmarshal config.yml", "error", unmarshalErr)
+		os.Exit(1)
 	}
 
 	if err := validateConfig(config); err != nil {
-		log.Fatalf("Invalid config.yml: %v", err)
+		slog.Error("Invalid config.yml", "error", err)
+		os.Exit(1)
 	}
+
+	slog.Info("Configuration loaded successfully")
 
 	common.Config = config
 }

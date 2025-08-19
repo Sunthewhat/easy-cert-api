@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"fmt"
 	"log/slog"
 	"strings"
 
@@ -53,8 +52,10 @@ func Init(app *fiber.App) {
 
 	// Handle OPTIONS requests (CORS preflight)
 	api.Options("/health", func(c *fiber.Ctx) error {
-		slog.Info(fmt.Sprintf("Health Check OPTIONS! Method: %s, Path: %s, User-Agent: %s\n",
-			c.Method(), c.Path(), c.Get("User-Agent")))
+		slog.Debug("Health Check OPTIONS request", 
+			"method", c.Method(), 
+			"path", c.Path(), 
+			"user_agent", c.Get("User-Agent"))
 		return c.SendStatus(200)
 	})
 
@@ -67,6 +68,7 @@ func Init(app *fiber.App) {
 	// Setup all route modules
 	SetupAuthRoutes(v1)
 	SetupCertificateRoutes(v1)
+	SetupParticipantRoutes(v1)
 
 	// Handle favicon requests to prevent 404s
 	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
