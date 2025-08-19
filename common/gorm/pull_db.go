@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/bsthun/gut"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"gorm.io/driver/postgres"
 	"gorm.io/gen"
@@ -38,7 +37,7 @@ func Pull_db() {
 	})
 
 	if connectionErr != nil {
-		gut.Fatal("Failed to connect to database", connectionErr)
+		log.Fatalf("Failed to connect to database: %v", connectionErr)
 	}
 
 	g := gen.NewGenerator(

@@ -1,7 +1,6 @@
 package auth_controller
 
 import (
-	"github.com/bsthun/gut"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/model/userModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
@@ -18,8 +17,9 @@ func Register(c *fiber.Ctx) error {
 	}
 
 	// Validate Body structure
-	if validateErr := gut.Validate(body); validateErr != nil {
-		return response.SendFailed(c, "Missing required fields")
+	if err := util.ValidateStruct(body); err != nil {
+		errors := util.GetValidationErrors(err)
+		return response.SendFailed(c, errors[0]) // Return first validation error
 	}
 
 	// Check if username already existed

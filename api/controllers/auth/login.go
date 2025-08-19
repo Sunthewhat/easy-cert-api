@@ -1,7 +1,8 @@
 package auth_controller
 
 import (
-	"github.com/bsthun/gut"
+	"log/slog"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/model/userModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
@@ -16,14 +17,16 @@ func Login(c *fiber.Ctx) error {
 		return response.SendError(c, "Failed to parse body")
 	}
 
-	if validateErr := gut.Validate(body); validateErr != nil {
-		return response.SendFailed(c, "Missing required fields")
+	if err := util.ValidateStruct(body); err != nil {
+		errors := util.GetValidationErrors(err)
+		return response.SendFailed(c, errors[0]) // Return first validation error
 	}
 
 	user, queryErr := userModel.GetByUsername(body.Username)
 
 	if user == nil {
 		if queryErr != nil {
+			slog.Error("Auth Login")
 			return response.SendInternalError(c, queryErr)
 		} else {
 			return response.SendFailed(c, "User not found")

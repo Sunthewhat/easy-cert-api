@@ -2,10 +2,10 @@ package mongo
 
 import (
 	"context"
+	"log"
 	"log/slog"
 	"time"
 
-	"github.com/bsthun/gut"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -20,13 +20,13 @@ func InitMongo() {
 	client, err := mongo.Connect(ctx, clientOptions)
 
 	if err != nil {
-		gut.Fatal("Failed to connect to MongoDB", err)
+		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
 
 	err = client.Ping(ctx, nil)
 
 	if err != nil {
-		gut.Fatal("Failed to ping MongoDB", err)
+		log.Fatalf("Failed to ping MongoDB: %v", err)
 	}
 
 	slog.Info("Mongo Connected!")

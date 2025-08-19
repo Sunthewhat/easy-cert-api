@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/bsthun/gut"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/type/shared/model"
 	"gorm.io/driver/postgres"
@@ -35,7 +34,7 @@ func Push_db() {
 	})
 
 	if err != nil {
-		gut.Fatal("Failed to connect to database", err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
 	if err := db.AutoMigrate(
@@ -44,6 +43,6 @@ func Push_db() {
 		new(model.Participant),
 		new(model.Graphic),
 	); err != nil {
-		gut.Fatal("Failed to migrate database", err)
+		log.Fatalf("Failed to migrate database: %v", err)
 	}
 }
