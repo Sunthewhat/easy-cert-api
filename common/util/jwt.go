@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/sunthewhat/secure-docs-api/common"
-	"github.com/sunthewhat/secure-docs-api/type/shared"
+	"github.com/sunthewhat/easy-cert-api/common"
+	"github.com/sunthewhat/easy-cert-api/type/shared"
 )
 
 func GenerateAuthToken(id string) (string, error) {

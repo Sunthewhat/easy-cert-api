@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/bsthun/gut"
-	"github.com/sunthewhat/secure-docs-api/common"
+	"github.com/sunthewhat/easy-cert-api/common"
 	"gorm.io/driver/postgres"
 	"gorm.io/gen"
 	"gorm.io/gorm"

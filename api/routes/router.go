@@ -9,8 +9,8 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/sunthewhat/secure-docs-api/api/handler"
-	"github.com/sunthewhat/secure-docs-api/common"
+	"github.com/sunthewhat/easy-cert-api/api/handler"
+	"github.com/sunthewhat/easy-cert-api/common"
 )
 
 // Init initializes all routes and middleware
@@ -47,7 +47,7 @@ func Init(app *fiber.App) {
 	api.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status":  "ok",
-			"message": "IT Ticket Core API is running",
+			"message": "EasyCert API is running",
 		})
 	})
 

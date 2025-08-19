@@ -1,8 +1,8 @@
 package participantmodel
 
 import (
-	"github.com/sunthewhat/secure-docs-api/common"
-	"github.com/sunthewhat/secure-docs-api/type/shared/model"
+	"github.com/sunthewhat/easy-cert-api/common"
+	"github.com/sunthewhat/easy-cert-api/type/shared/model"
 )
 
 func Revoke(id string) (*model.Participant, error) {

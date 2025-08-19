@@ -3,7 +3,7 @@ package middleware
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/sunthewhat/secure-docs-api/common"
+	"github.com/sunthewhat/easy-cert-api/common"
 )
 
 func Cors() fiber.Handler {

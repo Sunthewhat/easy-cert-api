@@ -4,8 +4,8 @@ import (
 	"github.com/bsthun/gut"
 	"github.com/gofiber/fiber/v2"
 	jwtware "github.com/gofiber/jwt/v3"
-	"github.com/sunthewhat/secure-docs-api/common"
-	"github.com/sunthewhat/secure-docs-api/type/shared"
+	"github.com/sunthewhat/easy-cert-api/common"
+	"github.com/sunthewhat/easy-cert-api/type/shared"
 )
 
 func Jwt() fiber.Handler {

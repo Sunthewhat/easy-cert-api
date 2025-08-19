@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/bsthun/gut"
-	"github.com/sunthewhat/secure-docs-api/common"
-	"github.com/sunthewhat/secure-docs-api/type/shared/model"
+	"github.com/sunthewhat/easy-cert-api/common"
+	"github.com/sunthewhat/easy-cert-api/type/shared/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"

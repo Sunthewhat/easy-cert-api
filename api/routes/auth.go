@@ -2,7 +2,7 @@ package routes
 
 import (
 	"github.com/gofiber/fiber/v2"
-	auth_controller "github.com/sunthewhat/secure-docs-api/api/controllers/auth"
+	auth_controller "github.com/sunthewhat/easy-cert-api/api/controllers/auth"
 )
 
 func SetupAuthRoutes(router fiber.Router) {

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/bsthun/gut"
-	"github.com/sunthewhat/secure-docs-api/common"
+	"github.com/sunthewhat/easy-cert-api/common"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )

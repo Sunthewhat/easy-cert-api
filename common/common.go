@@ -1,8 +1,8 @@
 package common
 
 import (
-	"github.com/sunthewhat/secure-docs-api/type/shared"
-	"github.com/sunthewhat/secure-docs-api/type/shared/query"
+	"github.com/sunthewhat/easy-cert-api/type/shared"
+	"github.com/sunthewhat/easy-cert-api/type/shared/query"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 

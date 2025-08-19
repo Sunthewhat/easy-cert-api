@@ -3,10 +3,10 @@ package auth_controller
 import (
 	"github.com/bsthun/gut"
 	"github.com/gofiber/fiber/v2"
-	"github.com/sunthewhat/secure-docs-api/api/model/userModel"
-	"github.com/sunthewhat/secure-docs-api/common/util"
-	"github.com/sunthewhat/secure-docs-api/type/payload"
-	"github.com/sunthewhat/secure-docs-api/type/response"
+	"github.com/sunthewhat/easy-cert-api/api/model/userModel"
+	"github.com/sunthewhat/easy-cert-api/common/util"
+	"github.com/sunthewhat/easy-cert-api/type/payload"
+	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
 func Login(c *fiber.Ctx) error {

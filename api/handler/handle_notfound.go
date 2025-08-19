@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/sunthewhat/secure-docs-api/type/response"
+	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
 func HandleNotFound(c *fiber.Ctx) error {

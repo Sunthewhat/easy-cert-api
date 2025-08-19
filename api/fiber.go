@@ -5,10 +5,10 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/sunthewhat/secure-docs-api/api/handler"
-	"github.com/sunthewhat/secure-docs-api/api/middleware"
-	"github.com/sunthewhat/secure-docs-api/api/routes"
-	"github.com/sunthewhat/secure-docs-api/common"
+	"github.com/sunthewhat/easy-cert-api/api/handler"
+	"github.com/sunthewhat/easy-cert-api/api/middleware"
+	"github.com/sunthewhat/easy-cert-api/api/routes"
+	"github.com/sunthewhat/easy-cert-api/common"
 )
 
 func InitFiber() {

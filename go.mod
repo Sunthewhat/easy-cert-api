@@ -1,4 +1,4 @@
-module github.com/sunthewhat/secure-docs-api
+module github.com/sunthewhat/easy-cert-api
 
 go 1.23.4
 

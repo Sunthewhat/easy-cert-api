@@ -2,7 +2,7 @@ package routes
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/sunthewhat/secure-docs-api/type/response"
+	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
 // AuthMiddleware - JWT authentication middleware

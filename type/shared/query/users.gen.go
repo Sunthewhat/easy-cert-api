@@ -16,7 +16,7 @@ import (
 
 	"gorm.io/plugin/dbresolver"
 
-	"github.com/sunthewhat/secure-docs-api/type/shared/model"
+	"github.com/sunthewhat/easy-cert-api/type/shared/model"
 )
 
 func newUser(db *gorm.DB, opts ...gen.DOOption) user {

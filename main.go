@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 
-	"github.com/sunthewhat/secure-docs-api/api"
-	"github.com/sunthewhat/secure-docs-api/common/config"
-	"github.com/sunthewhat/secure-docs-api/common/gorm"
-	"github.com/sunthewhat/secure-docs-api/common/mongo"
+	"github.com/sunthewhat/easy-cert-api/api"
+	"github.com/sunthewhat/easy-cert-api/common/config"
+	"github.com/sunthewhat/easy-cert-api/common/gorm"
+	"github.com/sunthewhat/easy-cert-api/common/mongo"
 )
 
 func main() {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/bsthun/gut"
 	"github.com/gofiber/fiber/v2"
-	"github.com/sunthewhat/secure-docs-api/type/response"
+	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
 func HandleError(c *fiber.Ctx, err error) error {
