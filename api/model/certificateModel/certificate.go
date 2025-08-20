@@ -41,6 +41,20 @@ func GetAll() ([]*model.Certificate, error) {
 	return certs, nil
 }
 
+func GetByUser(userId string) ([]*model.Certificate, error) {
+	certs, queryErr := common.Gorm.Certificate.Where(common.Gorm.Certificate.UserID.Eq(userId)).Find()
+
+	if queryErr != nil {
+		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		slog.Error("Certificate GetByUser", "error", queryErr)
+		return nil, queryErr
+	}
+
+	return certs, nil
+}
+
 func GetById(certId string) (*model.Certificate, error) {
 	cert, queryErr := common.Gorm.Certificate.Where(common.Gorm.Certificate.ID.Eq(certId)).First()
 
