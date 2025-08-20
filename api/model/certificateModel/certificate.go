@@ -23,6 +23,20 @@ func GetAll() ([]*model.Certificate, error) {
 	return certs, nil
 }
 
+func GetById(certId string) (*model.Certificate, error) {
+	cert, queryErr := common.Gorm.Certificate.Where(common.Gorm.Certificate.ID.Eq(certId)).First()
+
+	if queryErr != nil {
+		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		slog.Error("Certificate GetById", "error", queryErr)
+		return nil, queryErr
+	}
+
+	return cert, nil
+}
+
 func Delete(id string) (*model.Certificate, error) {
 	cert, queryErr := common.Gorm.Certificate.Where(common.Gorm.Certificate.ID.Eq(id)).First()
 	if queryErr != nil {

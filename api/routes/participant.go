@@ -8,5 +8,6 @@ import (
 func SetupParticipantRoutes(router fiber.Router) {
 	participantGroup := router.Group("participant")
 
+	participantGroup.Post("add/:certId", participant_controller.Add)
 	participantGroup.Put(":id/revoke", participant_controller.Revoke)
 }
