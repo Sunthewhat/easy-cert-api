@@ -47,5 +47,10 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	slog.Info("Auth Login successful", "username", body.Username, "user_id", user.ID)
-	return response.SendSuccess(c, "Login Successfully", fiber.Map{"token": authToken})
+	return response.SendSuccess(c, "Login Successfully", fiber.Map{
+		"token":     authToken,
+		"firstname": user.Firstname,
+		"lastname":  user.Lastname,
+		"username":  user.Username,
+	})
 }
