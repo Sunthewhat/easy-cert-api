@@ -5,9 +5,27 @@ import (
 	"log/slog"
 
 	"github.com/sunthewhat/easy-cert-api/common"
+	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/shared/model"
 	"gorm.io/gorm"
 )
+
+func Create(certData payload.CreateCertificatePayload, userId string) (*model.Certificate, error) {
+	cert := &model.Certificate{
+		UserID: userId,
+		Name:   certData.Name,
+		Design: certData.Design,
+	}
+
+	createErr := common.Gorm.Certificate.Create(cert)
+
+	if createErr != nil {
+		slog.Error("Certificate Create", "error", createErr, "data", certData, "userId", userId)
+		return nil, createErr
+	}
+
+	return cert, nil
+}
 
 func GetAll() ([]*model.Certificate, error) {
 	certs, queryErr := common.Gorm.Certificate.Find()
