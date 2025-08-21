@@ -15,4 +15,5 @@ func SetupCertificateRoutes(router fiber.Router) {
 	certificateGroup.Post("", certificate_controller.Create)
 	certificateGroup.Put(":id", certificate_controller.Update)
 	certificateGroup.Delete(":certId", certificate_controller.Delete)
+	certificateGroup.Post("render/:certId", certificate_controller.Render)
 }

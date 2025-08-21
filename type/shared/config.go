@@ -8,4 +8,5 @@ type Config struct {
 	Postgres      *string   `yaml:"postgres" validate:"required"`
 	Mongo         *string   `yaml:"mongo" validate:"required"`
 	MongoDatabase *string   `yaml:"mongo_database" validate:"required"`
+	RendererUrl   *string   `yaml:"renderer_url" validate:"required"`
 }

@@ -1,18 +1,12 @@
 package participantmodel
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"log/slog"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/type/shared/model"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -24,39 +18,14 @@ type ParticipantCreateResult struct {
 	FailedPostgresIDs []string
 }
 
-func Revoke(id string) (*model.Participant, error) {
-	// Get the participant by ID
-	participant, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(id)).First()
-	if err != nil {
-		return nil, err
-	}
-
-	// Update the isrevoke field to true
-	_, err = common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(id)).Update(common.Gorm.Participant.Isrevoke, true)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return the updated participant
-	participant.Isrevoke = true
-	return participant, nil
-}
-
-// GetParticipantCollectionCount returns the count of participants in the MongoDB collection
-func GetParticipantCollectionCount(certId string) (int64, error) {
-	collectionName := "participant-" + certId
-	collection := common.Mongo.Collection(collectionName)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	count, err := collection.CountDocuments(ctx, bson.M{})
-	if err != nil {
-		slog.Error("ParticipantModel GetCollectionCount failed", "error", err, "cert_id", certId)
-		return 0, err
-	}
-
-	return count, nil
+// CombinedParticipant represents participant data from both databases
+type CombinedParticipant struct {
+	ID            string                 `json:"id"`
+	CertificateID string                 `json:"certificate_id"`
+	Isrevoke      bool                   `json:"is_revoked"`
+	CreatedAt     time.Time              `json:"created_at"`
+	UpdatedAt     time.Time              `json:"updated_at"`
+	DynamicData   map[string]any         `json:"data"`
 }
 
 // AddParticipants adds participants to both MongoDB (data) and PostgreSQL (index/status) with same IDs
@@ -125,219 +94,58 @@ func AddParticipants(certId string, participants []map[string]any) (*Participant
 	return result, nil
 }
 
-// addParticipantsToMongo handles MongoDB insertion with generated IDs
-func addParticipantsToMongo(certId string, participants []map[string]any, participantIDs []string) (*mongo.InsertManyResult, error) {
-	collectionName := "participant-" + certId
-	collection := common.Mongo.Collection(collectionName)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Prepare documents with metadata and custom IDs
-	var documents []any
-	for i, participant := range participants {
-		// Create a copy to avoid modifying original
-		doc := make(map[string]any)
-		for k, v := range participant {
-			doc[k] = v
-		}
-
-		// Add metadata with custom ID
-		doc["_id"] = participantIDs[i] // Use our generated UUID as MongoDB _id
-		doc["certificate_id"] = certId
-		documents = append(documents, doc)
+// GetParticipantsByCertId returns combined participant data from both PostgreSQL and MongoDB
+func GetParticipantsByCertId(certId string) ([]*CombinedParticipant, error) {
+	// Get PostgreSQL data
+	postgresParticipants, pgErr := GetParticipantsByPostgres(certId)
+	if pgErr != nil {
+		return nil, fmt.Errorf("failed to get PostgreSQL participants: %w", pgErr)
 	}
 
-	result, err := collection.InsertMany(ctx, documents)
-	if err != nil {
-		slog.Error("ParticipantModel MongoDB insertion failed", "error", err, "cert_id", certId)
-		return nil, err
+	// Get MongoDB data
+	mongoParticipants, mongoErr := GetParticipantsByMongo(certId)
+	if mongoErr != nil {
+		return nil, fmt.Errorf("failed to get MongoDB participants: %w", mongoErr)
 	}
 
-	slog.Info("ParticipantModel MongoDB insertion successful",
-		"cert_id", certId,
-		"collection", collectionName,
-		"inserted_count", len(result.InsertedIDs))
-
-	return result, nil
-}
-
-// addParticipantsToPostgres creates index/status records in PostgreSQL
-func addParticipantsToPostgres(certId string, participantIDs []string) ([]*model.Participant, []string) {
-	var successfulRecords []*model.Participant
-	var failedIDs []string
-
-	for _, id := range participantIDs {
-		participant := &model.Participant{
-			ID:            id,
-			CertificateID: certId,
-			Isrevoke:      false, // Default to not revoked
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
-		}
-
-		// Create record in PostgreSQL
-		createErr := common.Gorm.Participant.Create(participant)
-		if createErr != nil {
-			slog.Error("ParticipantModel PostgreSQL creation failed",
-				"error", createErr,
-				"participant_id", id,
-				"cert_id", certId)
-			failedIDs = append(failedIDs, id)
-			continue
-		}
-
-		successfulRecords = append(successfulRecords, participant)
-		slog.Debug("ParticipantModel PostgreSQL record created",
-			"participant_id", id,
-			"cert_id", certId)
-	}
-
-	slog.Info("ParticipantModel PostgreSQL creation summary",
-		"cert_id", certId,
-		"successful", len(successfulRecords),
-		"failed", len(failedIDs))
-
-	return successfulRecords, failedIDs
-}
-
-// GetExistingParticipantFields gets the field names from the first document in the collection
-func GetExistingParticipantFields(certId string) ([]string, error) {
-	collectionName := "participant-" + certId
-	collection := common.Mongo.Collection(collectionName)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Find the first document to get field structure
-	var existingDoc bson.M
-	err := collection.FindOne(ctx, bson.M{}).Decode(&existingDoc)
-	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return []string{}, nil // Empty collection, no existing fields
-		}
-		slog.Error("ParticipantModel GetExistingFields failed", "error", err, "cert_id", certId)
-		return nil, err
-	}
-
-	// Extract field names (excluding MongoDB internal fields)
-	var fields []string
-	for key := range existingDoc {
-		if key != "_id" { // Exclude MongoDB internal ID
-			fields = append(fields, key)
+	// Create a map of MongoDB data by ID for fast lookup
+	mongoDataMap := make(map[string]map[string]any)
+	for _, participant := range mongoParticipants {
+		if id, ok := participant["_id"].(string); ok {
+			mongoDataMap[id] = participant
 		}
 	}
 
-	sort.Strings(fields) // Sort for consistent comparison
-	slog.Info("ParticipantModel GetExistingFields", "cert_id", certId, "fields", fields)
-	return fields, nil
-}
-
-// ValidateFieldConsistency checks if new participant fields match existing ones
-func ValidateFieldConsistency(certId string, newParticipants []map[string]any) error {
-	existingFields, err := GetExistingParticipantFields(certId)
-	if err != nil {
-		return fmt.Errorf("failed to get existing fields: %w", err)
-	}
-
-	// If no existing fields (empty collection), allow any structure
-	if len(existingFields) == 0 {
-		slog.Info("ParticipantModel ValidateFieldConsistency: empty collection, allowing any fields", "cert_id", certId)
-		return nil
-	}
-
-	// Check each new participant
-	for i, participant := range newParticipants {
-		var newFields []string
-		for key := range participant {
-			newFields = append(newFields, key)
+	// Combine data
+	var combinedParticipants []*CombinedParticipant
+	for _, pgParticipant := range postgresParticipants {
+		combined := &CombinedParticipant{
+			ID:            pgParticipant.ID,
+			CertificateID: pgParticipant.CertificateID,
+			Isrevoke:      pgParticipant.Isrevoke,
+			CreatedAt:     pgParticipant.CreatedAt,
+			UpdatedAt:     pgParticipant.UpdatedAt,
+			DynamicData:   make(map[string]any),
 		}
-		sort.Strings(newFields)
 
-		// Compare field sets
-		if !areFieldsConsistent(existingFields, newFields) {
-			missingFields := findMissingFields(existingFields, newFields)
-			extraFields := findMissingFields(newFields, existingFields)
-
-			var errorMsg strings.Builder
-			errorMsg.WriteString(fmt.Sprintf("participant %d has inconsistent fields", i+1))
-
-			if len(missingFields) > 0 {
-				errorMsg.WriteString(fmt.Sprintf(", missing required fields: %s", strings.Join(missingFields, ", ")))
+		// Add MongoDB data if exists
+		if mongoData, exists := mongoDataMap[pgParticipant.ID]; exists {
+			// Copy all fields except internal ones
+			for key, value := range mongoData {
+				if key != "_id" && key != "certificate_id" {
+					combined.DynamicData[key] = value
+				}
 			}
-			if len(extraFields) > 0 {
-				errorMsg.WriteString(fmt.Sprintf(", unexpected fields: %s", strings.Join(extraFields, ", ")))
-			}
-
-			errorMsg.WriteString(fmt.Sprintf(". Expected fields: %s", strings.Join(existingFields, ", ")))
-
-			slog.Warn("ParticipantModel field validation failed",
-				"cert_id", certId,
-				"participant_index", i,
-				"expected_fields", existingFields,
-				"actual_fields", newFields,
-				"missing_fields", missingFields,
-				"extra_fields", extraFields)
-
-			return errors.New(errorMsg.String())
 		}
+
+		combinedParticipants = append(combinedParticipants, combined)
 	}
 
-	slog.Info("ParticipantModel ValidateFieldConsistency passed",
-		"cert_id", certId,
-		"participant_count", len(newParticipants),
-		"expected_fields", existingFields)
-	return nil
-}
+	slog.Info("ParticipantModel GetParticipantsByCertId", 
+		"cert_id", certId, 
+		"postgres_count", len(postgresParticipants),
+		"mongo_count", len(mongoParticipants),
+		"combined_count", len(combinedParticipants))
 
-// areFieldsConsistent checks if two field slices contain the same elements (ignoring auto-added fields)
-func areFieldsConsistent(existing, new []string) bool {
-	// Filter out auto-added fields from comparison
-	autoFields := []string{"certificate_id", "created_at", "updated_at"}
-
-	existingFiltered := filterOutFields(existing, autoFields)
-	newFiltered := filterOutFields(new, autoFields)
-
-	if len(existingFiltered) != len(newFiltered) {
-		return false
-	}
-
-	for i, field := range existingFiltered {
-		if field != newFiltered[i] {
-			return false
-		}
-	}
-	return true
-}
-
-// filterOutFields removes specified fields from a slice
-func filterOutFields(fields, toRemove []string) []string {
-	var result []string
-	removeMap := make(map[string]bool)
-	for _, field := range toRemove {
-		removeMap[field] = true
-	}
-
-	for _, field := range fields {
-		if !removeMap[field] {
-			result = append(result, field)
-		}
-	}
-	return result
-}
-
-// findMissingFields returns fields that are in 'required' but not in 'actual'
-func findMissingFields(required, actual []string) []string {
-	actualMap := make(map[string]bool)
-	for _, field := range actual {
-		actualMap[field] = true
-	}
-
-	var missing []string
-	for _, field := range required {
-		if !actualMap[field] {
-			missing = append(missing, field)
-		}
-	}
-	return missing
+	return combinedParticipants, nil
 }

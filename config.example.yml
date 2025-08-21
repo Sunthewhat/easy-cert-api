@@ -12,3 +12,5 @@ postgres: host=example.com user=db_user password=db_password dbname=db_name port
 mongo: mongodb://certapp_user:secure_password@localhost:27017/certificate_app
 
 mongo_database: certificate_app
+
+renderer_url: http://example.com
