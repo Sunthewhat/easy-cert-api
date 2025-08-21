@@ -7,6 +7,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.6
 	github.com/gofiber/jwt/v3 v3.3.10
 	github.com/golang-jwt/jwt/v4 v4.5.0
+	github.com/google/uuid v1.6.0
 	go.mongodb.org/mongo-driver v1.17.3
 	golang.org/x/crypto v0.38.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -24,7 +25,6 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-sql-driver/mysql v1.9.2 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.7.4 // indirect
