@@ -77,3 +77,22 @@ func addParticipantsToPostgres(certId string, participantIDs []string) ([]*model
 
 	return successfulRecords, failedIDs
 }
+
+func DeleteByCertIdFromPostgres(certId string) ([]*model.Participant, error) {
+	// First get all participants for the certificate to return them
+	participants, err := common.Gorm.Participant.Where(common.Gorm.Participant.CertificateID.Eq(certId)).Find()
+	if err != nil {
+		slog.Error("ParticipantModel DeleteByCertId get participants failed", "error", err, "cert_id", certId)
+		return nil, err
+	}
+
+	// Delete all participants for the certificate
+	result, err := common.Gorm.Participant.Where(common.Gorm.Participant.CertificateID.Eq(certId)).Delete()
+	if err != nil {
+		slog.Error("ParticipantModel DeleteByCertId delete failed", "error", err, "cert_id", certId)
+		return nil, err
+	}
+
+	slog.Info("ParticipantModel DeleteByCertId successful", "cert_id", certId, "deleted_count", result.RowsAffected)
+	return participants, nil
+}

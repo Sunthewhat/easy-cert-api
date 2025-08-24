@@ -149,3 +149,24 @@ func GetParticipantsByCertId(certId string) ([]*CombinedParticipant, error) {
 
 	return combinedParticipants, nil
 }
+
+// DeleteByCertId deletes participants from both PostgreSQL and MongoDB for a certificate
+func DeleteByCertId(certId string) ([]*model.Participant, error) {
+	// Delete from PostgreSQL first
+	participants, err := DeleteByCertIdFromPostgres(certId)
+	if err != nil {
+		slog.Error("ParticipantModel DeleteByCertId PostgreSQL deletion failed", "error", err, "cert_id", certId)
+		return nil, err
+	}
+
+	// Delete MongoDB collection
+	err = DeleteCollectionByCertIdFromMongo(certId)
+	if err != nil {
+		slog.Error("ParticipantModel DeleteByCertId MongoDB deletion failed", "error", err, "cert_id", certId)
+		return participants, err
+	}
+
+	slog.Info("ParticipantModel DeleteByCertId completed", "cert_id", certId, "postgres_count", len(participants))
+	return participants, nil
+}
+

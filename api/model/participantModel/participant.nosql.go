@@ -233,3 +233,17 @@ func findMissingFields(required, actual []string) []string {
 	}
 	return missing
 }
+
+// DeleteCollectionByCertId deletes the entire MongoDB collection for a certificate
+func DeleteCollectionByCertIdFromMongo(certId string) error {
+	collectionName := fmt.Sprintf("participant-%s", certId)
+
+	err := common.Mongo.Collection(collectionName).Drop(context.Background())
+	if err != nil {
+		slog.Error("ParticipantModel DeleteCollectionByCertId failed", "error", err, "cert_id", certId, "collection", collectionName)
+		return err
+	}
+
+	slog.Info("ParticipantModel DeleteCollectionByCertId successful", "cert_id", certId, "collection", collectionName)
+	return nil
+}

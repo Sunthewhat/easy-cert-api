@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
+	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
@@ -16,7 +17,26 @@ func Delete(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Certificate ID is required")
 	}
 
-	cert, err := certificatemodel.Delete(certId)
+	cert, err := certificatemodel.GetById(certId)
+
+	if err != nil {
+		slog.Error("Error getting certificate", "certId", certId)
+		return response.SendInternalError(c, err)
+	}
+
+	if cert == nil {
+		slog.Warn("Deleting non-existing certificate")
+		return response.SendFailed(c, "Certificate not found")
+	}
+
+	participants, err := participantmodel.DeleteByCertId(certId)
+
+	if err != nil {
+		slog.Error("Deleting participant before certificate", "error", err, "certId", certId)
+		return response.SendInternalError(c, err)
+	}
+
+	deletedCert, err := certificatemodel.Delete(certId)
 
 	if err != nil {
 		slog.Error("Certificate Delete controller failed", "error", err, "cert_id", certId)
@@ -26,6 +46,9 @@ func Delete(c *fiber.Ctx) error {
 		return response.SendInternalError(c, err)
 	}
 
-	slog.Info("Certificate Delete successful", "cert_id", certId, "cert_name", cert.Name)
-	return response.SendSuccess(c, "Certificate Deleted", cert)
+	slog.Info("Certificate Delete successful", "cert_id", certId, "cert_name", deletedCert.Name)
+	return response.SendSuccess(c, "Certificate Deleted", fiber.Map{
+		"certificate":  deletedCert,
+		"participants": participants,
+	})
 }
