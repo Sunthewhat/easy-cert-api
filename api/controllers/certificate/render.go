@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/sunthewhat/easy-cert-api/api/middleware"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/common"
+	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
@@ -34,6 +36,18 @@ func Render(c *fiber.Ctx) error {
 	if cert == nil {
 		slog.Warn("Certificate Render certificate not found", "cert_id", certId)
 		return response.SendFailed(c, "Certificate not found")
+	}
+
+	userId, success := middleware.GetUserFromContext(c)
+
+	if !success {
+		slog.Error("Certificate Render UserId not found in context")
+		return response.SendUnauthorized(c, "Unknown user request")
+	}
+
+	if userId != cert.UserID {
+		slog.Warn("Wrong Owner Request Render", "user", userId, "certificate-owner", cert.UserID)
+		return response.SendUnauthorized(c, "User did not own this certificate")
 	}
 
 	// Get participants data
@@ -58,9 +72,9 @@ func Render(c *fiber.Ctx) error {
 
 	// Construct renderer URL
 	rendererURL := fmt.Sprintf("%s/api/render", *common.Config.RendererUrl)
-	
-	slog.Info("Certificate Render sending request to renderer", 
-		"cert_id", certId, 
+
+	slog.Info("Certificate Render sending request to renderer",
+		"cert_id", certId,
 		"renderer_url", rendererURL,
 		"participant_count", len(participants))
 
@@ -97,13 +111,13 @@ func Render(c *fiber.Ctx) error {
 
 	// Check if request was successful
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		slog.Info("Certificate Render successful", 
-			"cert_id", certId, 
+		slog.Info("Certificate Render successful",
+			"cert_id", certId,
 			"status_code", resp.StatusCode,
 			"response_size", len(responseBody))
 
 		// Try to parse response as JSON
-		var rendererResponse map[string]any
+		var rendererResponse payload.RenderCertificatePayload
 		if parseErr := json.Unmarshal(responseBody, &rendererResponse); parseErr == nil {
 			return response.SendSuccess(c, "Certificate rendered successfully", rendererResponse)
 		} else {
@@ -113,11 +127,11 @@ func Render(c *fiber.Ctx) error {
 			})
 		}
 	} else {
-		slog.Error("Certificate Render renderer error", 
-			"cert_id", certId, 
+		slog.Error("Certificate Render renderer error",
+			"cert_id", certId,
 			"status_code", resp.StatusCode,
 			"response", string(responseBody))
-		
+
 		return response.SendError(c, fmt.Sprintf("Renderer service error: %s", string(responseBody)))
 	}
 }
