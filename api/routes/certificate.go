@@ -12,6 +12,7 @@ func SetupCertificateRoutes(router fiber.Router) {
 	certificateGroup.Use(middleware.AuthMiddleware())
 
 	certificateGroup.Get("", certificate_controller.GetByUser)
+	certificateGroup.Get(":certId", certificate_controller.GetById)
 	certificateGroup.Post("", certificate_controller.Create)
 	certificateGroup.Put(":id", certificate_controller.Update)
 	certificateGroup.Delete(":certId", certificate_controller.Delete)
