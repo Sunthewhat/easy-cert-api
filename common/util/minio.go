@@ -97,3 +97,33 @@ func DeleteFile(ctx context.Context, bucketName string, objectName string) error
 
 	return nil
 }
+
+func ListFilesByPrefix(ctx context.Context, bucketName string, prefix string, limit int) ([]string, error) {
+	if minioClient == nil {
+		return nil, fmt.Errorf("MinIO client not initialized")
+	}
+
+	var fileURLs []string
+	count := 0
+
+	objectCh := minioClient.ListObjects(ctx, bucketName, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	})
+
+	for object := range objectCh {
+		if object.Err != nil {
+			return nil, fmt.Errorf("failed to list objects: %w", object.Err)
+		}
+
+		if limit > 0 && count >= limit {
+			break
+		}
+
+		url := fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, bucketName, object.Key)
+		fileURLs = append(fileURLs, url)
+		count++
+	}
+
+	return fileURLs, nil
+}

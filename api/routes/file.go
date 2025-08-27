@@ -14,4 +14,7 @@ func SetupFileRoutes(app fiber.Router) {
 
 	// File upload endpoint
 	fileGroup.Post("/:type", file.UploadResource)
+	
+	// Get all files by type endpoint
+	fileGroup.Get("/:type", file.GetAllResourceByType)
 }
