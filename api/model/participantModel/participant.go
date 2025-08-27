@@ -170,3 +170,48 @@ func DeleteByCertId(certId string) ([]*model.Participant, error) {
 	return participants, nil
 }
 
+// EditParticipantByID updates a participant's data with structure validation
+func EditParticipantByID(participantID string, newData map[string]any) (*CombinedParticipant, error) {
+	// First, get the participant from PostgreSQL to get certificate ID
+	participant, err := GetParticipantByIdFromPostgres(participantID)
+	if err != nil {
+		slog.Error("ParticipantModel EditParticipantByID: Failed to get participant from PostgreSQL", "error", err, "participant_id", participantID)
+		return nil, fmt.Errorf("participant not found: %w", err)
+	}
+
+	certId := participant.CertificateID
+
+	// Validate that new data structure matches existing structure
+	if err := validateEditDataStructure(certId, newData); err != nil {
+		slog.Warn("ParticipantModel EditParticipantByID: Data structure validation failed", "error", err, "participant_id", participantID, "cert_id", certId)
+		return nil, fmt.Errorf("data structure validation failed: %w", err)
+	}
+
+	// Update in MongoDB
+	err = updateParticipantInMongo(certId, participantID, newData)
+	if err != nil {
+		slog.Error("ParticipantModel EditParticipantByID: Failed to update MongoDB", "error", err, "participant_id", participantID, "cert_id", certId)
+		return nil, fmt.Errorf("failed to update participant data: %w", err)
+	}
+
+	// Update timestamp in PostgreSQL
+	err = updateParticipantTimestampInPostgres(participantID)
+	if err != nil {
+		slog.Warn("ParticipantModel EditParticipantByID: Failed to update PostgreSQL timestamp", "error", err, "participant_id", participantID)
+		// Don't fail the operation for timestamp update failure
+	}
+
+	// Return the updated combined participant data
+	combinedData := &CombinedParticipant{
+		ID:            participant.ID,
+		CertificateID: participant.CertificateID,
+		Isrevoke:      participant.Isrevoke,
+		CreatedAt:     participant.CreatedAt,
+		UpdatedAt:     time.Now(), // Use current time for updated_at
+		DynamicData:   newData,
+	}
+
+	slog.Info("ParticipantModel EditParticipantByID completed successfully", "participant_id", participantID, "cert_id", certId)
+	return combinedData, nil
+}
+

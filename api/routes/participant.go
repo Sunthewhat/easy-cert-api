@@ -14,4 +14,5 @@ func SetupParticipantRoutes(router fiber.Router) {
 	participantGroup.Get(":certId", participant_controller.GetByCert)
 	participantGroup.Post("add/:certId", participant_controller.Add)
 	participantGroup.Put("revoke/:id", participant_controller.Revoke)
+	participantGroup.Put("edit/:id", participant_controller.EditByID)
 }

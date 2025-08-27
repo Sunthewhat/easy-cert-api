@@ -96,3 +96,27 @@ func DeleteByCertIdFromPostgres(certId string) ([]*model.Participant, error) {
 	slog.Info("ParticipantModel DeleteByCertId successful", "cert_id", certId, "deleted_count", result.RowsAffected)
 	return participants, nil
 }
+
+// GetParticipantByIdFromPostgres returns a single participant by ID from PostgreSQL
+func GetParticipantByIdFromPostgres(participantID string) (*model.Participant, error) {
+	participant, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantID)).First()
+	if err != nil {
+		slog.Error("ParticipantModel GetParticipantByIdFromPostgres failed", "error", err, "participant_id", participantID)
+		return nil, err
+	}
+
+	slog.Info("ParticipantModel GetParticipantByIdFromPostgres success", "participant_id", participantID)
+	return participant, nil
+}
+
+// updateParticipantTimestampInPostgres updates the updated_at timestamp for a participant
+func updateParticipantTimestampInPostgres(participantID string) error {
+	_, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantID)).Update(common.Gorm.Participant.UpdatedAt, time.Now())
+	if err != nil {
+		slog.Error("ParticipantModel updateParticipantTimestampInPostgres failed", "error", err, "participant_id", participantID)
+		return err
+	}
+
+	slog.Info("ParticipantModel updateParticipantTimestampInPostgres success", "participant_id", participantID)
+	return nil
+}

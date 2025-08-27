@@ -247,3 +247,90 @@ func DeleteCollectionByCertIdFromMongo(certId string) error {
 	slog.Info("ParticipantModel DeleteCollectionByCertId successful", "cert_id", certId, "collection", collectionName)
 	return nil
 }
+
+// validateEditDataStructure validates that new data has the same structure as existing data
+func validateEditDataStructure(certId string, newData map[string]any) error {
+	existingFields, err := GetExistingParticipantFields(certId)
+	if err != nil {
+		return fmt.Errorf("failed to get existing fields: %w", err)
+	}
+
+	// If no existing fields (empty collection), cannot edit non-existent data
+	if len(existingFields) == 0 {
+		return errors.New("cannot edit participant data: no existing participants found for this certificate")
+	}
+
+	// Get fields from new data (excluding auto-added fields)
+	var newFields []string
+	for key := range newData {
+		newFields = append(newFields, key)
+	}
+	sort.Strings(newFields)
+
+	// Compare field sets using existing validation logic
+	if !areFieldsConsistent(existingFields, newFields) {
+		missingFields := findMissingFields(existingFields, newFields)
+		extraFields := findMissingFields(newFields, existingFields)
+
+		var errorMsg strings.Builder
+		errorMsg.WriteString("data structure mismatch")
+
+		if len(missingFields) > 0 {
+			errorMsg.WriteString(fmt.Sprintf(", missing required fields: %s", strings.Join(missingFields, ", ")))
+		}
+		if len(extraFields) > 0 {
+			errorMsg.WriteString(fmt.Sprintf(", unexpected fields: %s", strings.Join(extraFields, ", ")))
+		}
+
+		errorMsg.WriteString(fmt.Sprintf(". Expected fields: %s", strings.Join(existingFields, ", ")))
+
+		slog.Warn("ParticipantModel edit validation failed",
+			"cert_id", certId,
+			"expected_fields", existingFields,
+			"actual_fields", newFields,
+			"missing_fields", missingFields,
+			"extra_fields", extraFields)
+
+		return errors.New(errorMsg.String())
+	}
+
+	slog.Info("ParticipantModel edit validation passed", "cert_id", certId, "fields", newFields)
+	return nil
+}
+
+// updateParticipantInMongo updates a participant's data in MongoDB
+func updateParticipantInMongo(certId, participantID string, newData map[string]any) error {
+	collectionName := "participant-" + certId
+	collection := common.Mongo.Collection(collectionName)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Create update document - only update the provided fields
+	updateDoc := bson.M{"$set": newData}
+
+	// Update the document
+	result, err := collection.UpdateOne(
+		ctx,
+		bson.M{"_id": participantID},
+		updateDoc,
+	)
+
+	if err != nil {
+		slog.Error("ParticipantModel updateParticipantInMongo failed", "error", err, "cert_id", certId, "participant_id", participantID)
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		slog.Warn("ParticipantModel updateParticipantInMongo: no document matched", "cert_id", certId, "participant_id", participantID)
+		return errors.New("participant not found in MongoDB")
+	}
+
+	slog.Info("ParticipantModel updateParticipantInMongo successful",
+		"cert_id", certId,
+		"participant_id", participantID,
+		"matched_count", result.MatchedCount,
+		"modified_count", result.ModifiedCount)
+
+	return nil
+}
