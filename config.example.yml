@@ -14,3 +14,13 @@ mongo: mongodb://certapp_user:secure_password@localhost:27017/certificate_app
 mongo_database: certificate_app
 
 renderer_url: http://example.com
+
+minio_endpoint: http://minio.sit.kmutt.ac.th
+
+minio_access_key: access
+
+minio_secret_key: private
+
+bucket_resource: bucket_resource
+
+bucket_certificate: bucket_certificate

@@ -69,6 +69,7 @@ func Init(app *fiber.App) {
 	SetupAuthRoutes(v1)
 	SetupCertificateRoutes(v1)
 	SetupParticipantRoutes(v1)
+	SetupFileRoutes(v1)
 
 	// Handle favicon requests to prevent 404s
 	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
