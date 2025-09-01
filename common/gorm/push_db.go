@@ -40,7 +40,6 @@ func Push_db() {
 	}
 
 	if err := db.AutoMigrate(
-		new(model.User),
 		new(model.Certificate),
 		new(model.Participant),
 		new(model.Graphic),

@@ -215,3 +215,33 @@ func EditParticipantByID(participantID string, newData map[string]any) (*Combine
 	return combinedData, nil
 }
 
+// DeleteParticipantByID deletes a single participant from both PostgreSQL and MongoDB by participant ID
+func DeleteParticipantByID(participantID string) (*model.Participant, error) {
+	// First, get the participant from PostgreSQL to get certificate ID and return data
+	participant, err := GetParticipantByIdFromPostgres(participantID)
+	if err != nil {
+		slog.Error("ParticipantModel DeleteParticipantByID: Failed to get participant from PostgreSQL", "error", err, "participant_id", participantID)
+		return nil, fmt.Errorf("participant not found: %w", err)
+	}
+
+	certId := participant.CertificateID
+
+	// Delete from PostgreSQL
+	err = deleteParticipantByIdFromPostgres(participantID)
+	if err != nil {
+		slog.Error("ParticipantModel DeleteParticipantByID: Failed to delete from PostgreSQL", "error", err, "participant_id", participantID)
+		return nil, fmt.Errorf("failed to delete participant from PostgreSQL: %w", err)
+	}
+
+	// Delete from MongoDB
+	err = deleteParticipantByIdFromMongo(certId, participantID)
+	if err != nil {
+		slog.Error("ParticipantModel DeleteParticipantByID: Failed to delete from MongoDB", "error", err, "participant_id", participantID, "cert_id", certId)
+		// Note: PostgreSQL record is already deleted, so we log the error but don't fail the operation completely
+		slog.Warn("ParticipantModel DeleteParticipantByID: MongoDB deletion failed but PostgreSQL succeeded", "participant_id", participantID, "cert_id", certId)
+	}
+
+	slog.Info("ParticipantModel DeleteParticipantByID completed", "participant_id", participantID, "cert_id", certId)
+	return participant, nil
+}
+

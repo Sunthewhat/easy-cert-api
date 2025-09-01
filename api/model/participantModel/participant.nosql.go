@@ -334,3 +334,31 @@ func updateParticipantInMongo(certId, participantID string, newData map[string]a
 
 	return nil
 }
+
+// deleteParticipantByIdFromMongo deletes a single participant from MongoDB by participant ID
+func deleteParticipantByIdFromMongo(certId, participantID string) error {
+	collectionName := "participant-" + certId
+	collection := common.Mongo.Collection(collectionName)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Delete the document with the specified ID
+	result, err := collection.DeleteOne(ctx, bson.M{"_id": participantID})
+	if err != nil {
+		slog.Error("ParticipantModel deleteParticipantByIdFromMongo failed", "error", err, "cert_id", certId, "participant_id", participantID)
+		return err
+	}
+
+	if result.DeletedCount == 0 {
+		slog.Warn("ParticipantModel deleteParticipantByIdFromMongo: no document deleted", "cert_id", certId, "participant_id", participantID)
+		return fmt.Errorf("participant not found in MongoDB")
+	}
+
+	slog.Info("ParticipantModel deleteParticipantByIdFromMongo successful",
+		"cert_id", certId,
+		"participant_id", participantID,
+		"deleted_count", result.DeletedCount)
+
+	return nil
+}

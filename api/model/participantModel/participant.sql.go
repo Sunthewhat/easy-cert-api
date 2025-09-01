@@ -1,6 +1,7 @@
 package participantmodel
 
 import (
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -107,6 +108,23 @@ func GetParticipantByIdFromPostgres(participantID string) (*model.Participant, e
 
 	slog.Info("ParticipantModel GetParticipantByIdFromPostgres success", "participant_id", participantID)
 	return participant, nil
+}
+
+// deleteParticipantByIdFromPostgres deletes a single participant from PostgreSQL by participant ID
+func deleteParticipantByIdFromPostgres(participantID string) error {
+	result, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantID)).Delete()
+	if err != nil {
+		slog.Error("ParticipantModel deleteParticipantByIdFromPostgres failed", "error", err, "participant_id", participantID)
+		return err
+	}
+
+	if result.RowsAffected == 0 {
+		slog.Warn("ParticipantModel deleteParticipantByIdFromPostgres: no rows deleted", "participant_id", participantID)
+		return fmt.Errorf("participant not found")
+	}
+
+	slog.Info("ParticipantModel deleteParticipantByIdFromPostgres success", "participant_id", participantID, "rows_affected", result.RowsAffected)
+	return nil
 }
 
 // updateParticipantTimestampInPostgres updates the updated_at timestamp for a participant

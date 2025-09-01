@@ -21,7 +21,6 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		Certificate: newCertificate(db, opts...),
 		Graphic:     newGraphic(db, opts...),
 		Participant: newParticipant(db, opts...),
-		User:        newUser(db, opts...),
 	}
 }
 
@@ -31,7 +30,6 @@ type Query struct {
 	Certificate certificate
 	Graphic     graphic
 	Participant participant
-	User        user
 }
 
 func (q *Query) Available() bool { return q.db != nil }
@@ -42,7 +40,6 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		Certificate: q.Certificate.clone(db),
 		Graphic:     q.Graphic.clone(db),
 		Participant: q.Participant.clone(db),
-		User:        q.User.clone(db),
 	}
 }
 
@@ -60,7 +57,6 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		Certificate: q.Certificate.replaceDB(db),
 		Graphic:     q.Graphic.replaceDB(db),
 		Participant: q.Participant.replaceDB(db),
-		User:        q.User.replaceDB(db),
 	}
 }
 
@@ -68,7 +64,6 @@ type queryCtx struct {
 	Certificate *certificateDo
 	Graphic     *graphicDo
 	Participant *participantDo
-	User        *userDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
@@ -76,7 +71,6 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		Certificate: q.Certificate.WithContext(ctx),
 		Graphic:     q.Graphic.WithContext(ctx),
 		Participant: q.Participant.WithContext(ctx),
-		User:        q.User.WithContext(ctx),
 	}
 }
 
