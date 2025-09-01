@@ -72,6 +72,10 @@ func RefreshSSO(token string) (*shared.SsoTokenType, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("invalid user token")
+	}
+
 	var ssoResponse shared.SsoTokenType
 	if err := json.NewDecoder(resp.Body).Decode(&ssoResponse); err != nil {
 		return nil, err
