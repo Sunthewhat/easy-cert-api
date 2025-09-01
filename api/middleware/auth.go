@@ -35,33 +35,24 @@ func AuthMiddleware() fiber.Handler {
 
 		token := tokenParts[1]
 
-		// Validate and decode JWT token
-		claims, err := util.DecodeAuthToken(token)
+		newToken, err := util.RefreshSSO(token)
 		if err != nil {
-			slog.Warn("AuthMiddleware: token validation failed",
-				"error", err,
-				"path", c.Path(),
-				"method", c.Method(),
-				"ip", c.IP())
-			return response.SendUnauthorized(c, "Invalid or expired token")
+			slog.Error("Refresh token failed", "error", err)
+			return response.SendUnauthorized(c, err.Error())
 		}
 
-		// Ensure user ID exists in claims
-		if claims.UserId == nil || *claims.UserId == "" {
-			slog.Warn("AuthMiddleware: missing user ID in token claims",
-				"path", c.Path(),
-				"method", c.Method(),
-				"ip", c.IP())
-			return response.SendUnauthorized(c, "Invalid token: missing user information")
+		jwtPayload, err := util.DecodeJWTToken(newToken.AccessToken)
+		if err != nil {
+			slog.Error("Failed to decode JWT token from refreshed token", "errror", err)
 		}
 
 		// Set user information in context for use by handlers
-		c.Locals("user_id", *claims.UserId)
-		c.Locals("jwt_claims", claims)
-		c.Locals("is_authenticated", true)
+		c.Locals("user_id", jwtPayload.Sid)
+		// c.Locals("refresh_token", newToken.RefreshToken)
+		c.Set("X-Refresh-Token", newToken.RefreshToken)
 
 		slog.Info("AuthMiddleware: authentication successful",
-			"user_id", *claims.UserId,
+			"user_id", jwtPayload.Sid,
 			"path", c.Path(),
 			"method", c.Method(),
 			"ip", c.IP())

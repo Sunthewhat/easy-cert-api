@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/sunthewhat/easy-cert-api/api/model/userModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -22,35 +21,24 @@ func Login(c *fiber.Ctx) error {
 		return response.SendFailed(c, errors[0]) // Return first validation error
 	}
 
-	user, queryErr := userModel.GetByUsername(body.Username)
-
-	if user == nil {
-		if queryErr != nil {
-			slog.Error("Auth Login database query failed", "error", queryErr, "username", body.Username)
-			return response.SendInternalError(c, queryErr)
-		} else {
-			slog.Info("Auth Login attempt with non-existent user", "username", body.Username)
-			return response.SendFailed(c, "User not found")
-		}
-	}
-
-	if isPasswordMatch := util.CheckPassword(body.Password, user.Password); !isPasswordMatch {
-		slog.Warn("Auth Login failed password check", "username", body.Username)
-		return response.SendFailed(c, "Incorrect Password")
-	}
-
-	authToken, err := util.GenerateAuthToken(user.ID)
+	ssoResponse, err := util.LoginSSO(body.Username, body.Password)
 
 	if err != nil {
-		slog.Error("Auth Login JWT generation failed", "error", err, "user_id", user.ID)
-		return response.SendError(c, "Failed to generate JWT Token")
+		slog.Error("SSO login Failed")
+		return response.SendInternalError(c, err)
 	}
 
-	slog.Info("Auth Login successful", "username", body.Username, "user_id", user.ID)
-	return response.SendSuccess(c, "Login Successfully", fiber.Map{
-		"token":     authToken,
-		"firstname": user.Firstname,
-		"lastname":  user.Lastname,
-		"username":  user.Username,
+	// Decode the JWT access token
+	jwtPayload, err := util.DecodeJWTToken(ssoResponse.AccessToken)
+	if err != nil {
+		slog.Error("Failed to decode JWT token", "error", err)
+		return response.SendInternalError(c, err)
+	}
+
+	return response.SendSuccess(c, "Login Successfull", fiber.Map{
+		"token":     ssoResponse.RefreshToken,
+		"firstname": jwtPayload.GivenName,
+		"lastname":  jwtPayload.FamilyName,
+		"username":  jwtPayload.PreferredUsername,
 	})
 }

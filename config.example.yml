@@ -24,3 +24,9 @@ minio_secret_key: private
 bucket_resource: bucket_resource
 
 bucket_certificate: bucket_certificate
+
+sso_issuer_url: http:sso.com
+
+sso_client: client
+
+sso_secret: secret
