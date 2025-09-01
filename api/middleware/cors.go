@@ -21,6 +21,7 @@ func Cors() fiber.Handler {
 	config := cors.Config{
 		AllowOrigins:     origins,
 		AllowCredentials: true,
+		ExposeHeaders:    "X-Refresh-Token",
 	}
 
 	return cors.New(config)
