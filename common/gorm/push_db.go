@@ -42,7 +42,6 @@ func Push_db() {
 	if err := db.AutoMigrate(
 		new(model.Certificate),
 		new(model.Participant),
-		new(model.Graphic),
 	); err != nil {
 		slog.Error("Failed to migrate database", "error", err)
 		os.Exit(1)
