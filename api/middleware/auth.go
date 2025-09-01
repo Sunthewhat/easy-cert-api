@@ -47,12 +47,12 @@ func AuthMiddleware() fiber.Handler {
 		}
 
 		// Set user information in context for use by handlers
-		c.Locals("user_id", jwtPayload.Sid)
+		c.Locals("user_id", jwtPayload.Email)
 		// c.Locals("refresh_token", newToken.RefreshToken)
 		c.Set("X-Refresh-Token", newToken.RefreshToken)
 
 		slog.Info("AuthMiddleware: authentication successful",
-			"user_id", jwtPayload.Sid,
+			"user_id", jwtPayload.Email,
 			"path", c.Path(),
 			"method", c.Method(),
 			"ip", c.IP())
