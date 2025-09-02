@@ -12,12 +12,13 @@ const TableNameParticipant = "participants"
 
 // Participant mapped from table <participants>
 type Participant struct {
-	ID            string    `gorm:"column:id;primaryKey;default:gen_random_uuid()" json:"id"`
-	CertificateID string    `gorm:"column:certificate_id;not null" json:"certificate_id"`
-	Isrevoke      bool      `gorm:"column:isrevoke;not null" json:"isrevoke"`
-	CreatedAt     time.Time `gorm:"column:created_at;not null;default:now()" json:"created_at"`
-	UpdatedAt     time.Time `gorm:"column:updated_at;not null;default:now()" json:"updated_at"`
-	IsDistributed bool      `gorm:"column:is_distributed" json:"is_distributed"`
+	ID             string    `gorm:"column:id;primaryKey;default:gen_random_uuid()" json:"id"`
+	CertificateID  string    `gorm:"column:certificate_id;not null" json:"certificate_id"`
+	Isrevoke       bool      `gorm:"column:isrevoke;not null" json:"isrevoke"`
+	CreatedAt      time.Time `gorm:"column:created_at;not null;default:now()" json:"created_at"`
+	UpdatedAt      time.Time `gorm:"column:updated_at;not null;default:now()" json:"updated_at"`
+	IsDistributed  bool      `gorm:"column:is_distributed" json:"is_distributed"`
+	CertificateURL string    `gorm:"column:certificate_url" json:"certificate_url"`
 }
 
 // TableName Participant's table name

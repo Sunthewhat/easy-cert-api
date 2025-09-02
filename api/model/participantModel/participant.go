@@ -20,13 +20,14 @@ type ParticipantCreateResult struct {
 
 // CombinedParticipant represents participant data from both databases
 type CombinedParticipant struct {
-	ID            string         `json:"id"`
-	CertificateID string         `json:"certificate_id"`
-	IsRevoke      bool           `json:"is_revoked"`
-	IsDistributed bool           `json:"is_distributed"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
-	DynamicData   map[string]any `json:"data"`
+	ID             string         `json:"id"`
+	CertificateID  string         `json:"certificate_id"`
+	IsRevoke       bool           `json:"is_revoked"`
+	IsDistributed  bool           `json:"is_distributed"`
+	CertificateURL string         `json:"certificate_url"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	DynamicData    map[string]any `json:"data"`
 }
 
 // AddParticipants adds participants to both MongoDB (data) and PostgreSQL (index/status) with same IDs
@@ -120,14 +121,16 @@ func GetParticipantsByCertId(certId string) ([]*CombinedParticipant, error) {
 	// Combine data
 	var combinedParticipants []*CombinedParticipant
 	for _, pgParticipant := range postgresParticipants {
+
 		combined := &CombinedParticipant{
-			ID:            pgParticipant.ID,
-			CertificateID: pgParticipant.CertificateID,
-			IsRevoke:      pgParticipant.Isrevoke,
-			IsDistributed: pgParticipant.IsDistributed,
-			CreatedAt:     pgParticipant.CreatedAt,
-			UpdatedAt:     pgParticipant.UpdatedAt,
-			DynamicData:   make(map[string]any),
+			ID:             pgParticipant.ID,
+			CertificateID:  pgParticipant.CertificateID,
+			IsRevoke:       pgParticipant.Isrevoke,
+			IsDistributed:  pgParticipant.IsDistributed,
+			CertificateURL: pgParticipant.CertificateURL,
+			CreatedAt:      pgParticipant.CreatedAt,
+			UpdatedAt:      pgParticipant.UpdatedAt,
+			DynamicData:    make(map[string]any),
 		}
 
 		// Add MongoDB data if exists
@@ -203,15 +206,18 @@ func EditParticipantByID(participantID string, newData map[string]any) (*Combine
 		// Don't fail the operation for timestamp update failure
 	}
 
+	// CertificateURL is already a string, no need for null check
+
 	// Return the updated combined participant data
 	combinedData := &CombinedParticipant{
-		ID:            participant.ID,
-		CertificateID: participant.CertificateID,
-		IsRevoke:      participant.Isrevoke,
-		IsDistributed: participant.IsDistributed,
-		CreatedAt:     participant.CreatedAt,
-		UpdatedAt:     time.Now(), // Use current time for updated_at
-		DynamicData:   newData,
+		ID:             participant.ID,
+		CertificateID:  participant.CertificateID,
+		IsRevoke:       participant.Isrevoke,
+		IsDistributed:  participant.IsDistributed,
+		CertificateURL: participant.CertificateURL,
+		CreatedAt:      participant.CreatedAt,
+		UpdatedAt:      time.Now(), // Use current time for updated_at
+		DynamicData:    newData,
 	}
 
 	slog.Info("ParticipantModel EditParticipantByID completed successfully", "participant_id", participantID, "cert_id", certId)

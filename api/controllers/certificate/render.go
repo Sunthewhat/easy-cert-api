@@ -119,7 +119,36 @@ func Render(c *fiber.Ctx) error {
 		// Try to parse response as JSON
 		var rendererResponse payload.RenderCertificatePayload
 		if parseErr := json.Unmarshal(responseBody, &rendererResponse); parseErr == nil {
-			return response.SendSuccess(c, "Certificate rendered successfully", rendererResponse)
+			// Update participant certificate URLs
+			for _, result := range rendererResponse.Results {
+				if result.Status == "success" && result.FilePath != "" {
+					err := participantmodel.UpdateParticipantCertificateUrlInPostgres(result.ParticipantId, fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, *common.Config.BucketCertificate, result.FilePath))
+					if err != nil {
+						slog.Warn("Certificate Render failed to update participant certificate URL",
+							"error", err,
+							"participant_id", result.ParticipantId,
+							"file_path", result.FilePath)
+					} else {
+						slog.Info("Certificate Render updated participant certificate URL",
+							"participant_id", result.ParticipantId,
+							"file_path", result.FilePath)
+					}
+				}
+			}
+
+			// Get updated participants data
+			updatedParticipants, err := participantmodel.GetParticipantsByCertId(certId)
+			if err != nil {
+				slog.Error("Certificate Render failed to get updated participants", "error", err, "cert_id", certId)
+				// Fallback to original response if getting updated participants fails
+				return response.SendSuccess(c, "Certificate rendered successfully", rendererResponse)
+			}
+
+			// Return updated participants with zipFilePath
+			return response.SendSuccess(c, "Certificate rendered successfully", map[string]any{
+				"participants": updatedParticipants,
+				"zipFilePath":  rendererResponse.ZipFilePath,
+			})
 		} else {
 			// If not JSON, return raw response
 			return response.SendSuccess(c, "Certificate rendered successfully", map[string]any{

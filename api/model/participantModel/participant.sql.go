@@ -99,42 +99,52 @@ func DeleteByCertIdFromPostgres(certId string) ([]*model.Participant, error) {
 }
 
 // GetParticipantByIdFromPostgres returns a single participant by ID from PostgreSQL
-func GetParticipantByIdFromPostgres(participantID string) (*model.Participant, error) {
-	participant, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantID)).First()
+func GetParticipantByIdFromPostgres(participantId string) (*model.Participant, error) {
+	participant, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantId)).First()
 	if err != nil {
-		slog.Error("ParticipantModel GetParticipantByIdFromPostgres failed", "error", err, "participant_id", participantID)
+		slog.Error("ParticipantModel GetParticipantByIdFromPostgres failed", "error", err, "participant_id", participantId)
 		return nil, err
 	}
 
-	slog.Info("ParticipantModel GetParticipantByIdFromPostgres success", "participant_id", participantID)
+	slog.Info("ParticipantModel GetParticipantByIdFromPostgres success", "participant_id", participantId)
 	return participant, nil
 }
 
 // deleteParticipantByIdFromPostgres deletes a single participant from PostgreSQL by participant ID
-func deleteParticipantByIdFromPostgres(participantID string) error {
-	result, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantID)).Delete()
+func deleteParticipantByIdFromPostgres(participantId string) error {
+	result, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantId)).Delete()
 	if err != nil {
-		slog.Error("ParticipantModel deleteParticipantByIdFromPostgres failed", "error", err, "participant_id", participantID)
+		slog.Error("ParticipantModel deleteParticipantByIdFromPostgres failed", "error", err, "participant_id", participantId)
 		return err
 	}
 
 	if result.RowsAffected == 0 {
-		slog.Warn("ParticipantModel deleteParticipantByIdFromPostgres: no rows deleted", "participant_id", participantID)
+		slog.Warn("ParticipantModel deleteParticipantByIdFromPostgres: no rows deleted", "participant_id", participantId)
 		return fmt.Errorf("participant not found")
 	}
 
-	slog.Info("ParticipantModel deleteParticipantByIdFromPostgres success", "participant_id", participantID, "rows_affected", result.RowsAffected)
+	slog.Info("ParticipantModel deleteParticipantByIdFromPostgres success", "participant_id", participantId, "rows_affected", result.RowsAffected)
 	return nil
 }
 
 // updateParticipantTimestampInPostgres updates the updated_at timestamp for a participant
-func updateParticipantTimestampInPostgres(participantID string) error {
-	_, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantID)).Update(common.Gorm.Participant.UpdatedAt, time.Now())
+func updateParticipantTimestampInPostgres(participantId string) error {
+	_, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantId)).Update(common.Gorm.Participant.UpdatedAt, time.Now())
 	if err != nil {
-		slog.Error("ParticipantModel updateParticipantTimestampInPostgres failed", "error", err, "participant_id", participantID)
+		slog.Error("ParticipantModel updateParticipantTimestampInPostgres failed", "error", err, "participant_id", participantId)
 		return err
 	}
 
-	slog.Info("ParticipantModel updateParticipantTimestampInPostgres success", "participant_id", participantID)
+	slog.Info("ParticipantModel updateParticipantTimestampInPostgres success", "participant_id", participantId)
+	return nil
+}
+
+func UpdateParticipantCertificateUrlInPostgres(participantId string, certificateUrl string) error {
+	_, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantId)).Update(common.Gorm.Participant.CertificateURL, certificateUrl)
+	if err != nil {
+		slog.Error("ParticipantModel updateParticipantCertificateUrlInPostgres failed", "error", err, "participantId", participantId, "certificateUrl", certificateUrl)
+		return err
+	}
+	slog.Info("ParticipantModel updateParticipantCertificateUrlInPostgres success", "participantId", participantId)
 	return nil
 }
