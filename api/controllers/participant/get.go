@@ -11,6 +11,7 @@ import (
 
 func GetByCert(c *fiber.Ctx) error {
 	certId := c.Params("certId")
+	status := c.Query("status")
 
 	if certId == "" {
 		slog.Warn("Request get Participant with empty certificate ID")
@@ -34,6 +35,22 @@ func GetByCert(c *fiber.Ctx) error {
 	if err != nil {
 		slog.Error("Get participant Error", "error", err)
 		return response.SendInternalError(c, err)
+	}
+
+	// Initialize empty slice to avoid returning null
+	if participants == nil {
+		participants = []*participantmodel.CombinedParticipant{}
+	}
+
+	// Filter participants based on status query parameter
+	if status == "distributed" {
+		distributedParticipants := []*participantmodel.CombinedParticipant{}
+		for _, participant := range participants {
+			if participant.IsDistributed {
+				distributedParticipants = append(distributedParticipants, participant)
+			}
+		}
+		return response.SendSuccess(c, "Distributed Participants Fetched!", distributedParticipants)
 	}
 
 	return response.SendSuccess(c, "Participant Fetched!", participants)

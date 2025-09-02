@@ -20,12 +20,13 @@ type ParticipantCreateResult struct {
 
 // CombinedParticipant represents participant data from both databases
 type CombinedParticipant struct {
-	ID            string                 `json:"id"`
-	CertificateID string                 `json:"certificate_id"`
-	Isrevoke      bool                   `json:"is_revoked"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at"`
-	DynamicData   map[string]any         `json:"data"`
+	ID            string         `json:"id"`
+	CertificateID string         `json:"certificate_id"`
+	IsRevoke      bool           `json:"is_revoked"`
+	IsDistributed bool           `json:"is_distributed"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	DynamicData   map[string]any `json:"data"`
 }
 
 // AddParticipants adds participants to both MongoDB (data) and PostgreSQL (index/status) with same IDs
@@ -122,7 +123,8 @@ func GetParticipantsByCertId(certId string) ([]*CombinedParticipant, error) {
 		combined := &CombinedParticipant{
 			ID:            pgParticipant.ID,
 			CertificateID: pgParticipant.CertificateID,
-			Isrevoke:      pgParticipant.Isrevoke,
+			IsRevoke:      pgParticipant.Isrevoke,
+			IsDistributed: pgParticipant.IsDistributed,
 			CreatedAt:     pgParticipant.CreatedAt,
 			UpdatedAt:     pgParticipant.UpdatedAt,
 			DynamicData:   make(map[string]any),
@@ -141,8 +143,8 @@ func GetParticipantsByCertId(certId string) ([]*CombinedParticipant, error) {
 		combinedParticipants = append(combinedParticipants, combined)
 	}
 
-	slog.Info("ParticipantModel GetParticipantsByCertId", 
-		"cert_id", certId, 
+	slog.Info("ParticipantModel GetParticipantsByCertId",
+		"cert_id", certId,
 		"postgres_count", len(postgresParticipants),
 		"mongo_count", len(mongoParticipants),
 		"combined_count", len(combinedParticipants))
@@ -205,7 +207,8 @@ func EditParticipantByID(participantID string, newData map[string]any) (*Combine
 	combinedData := &CombinedParticipant{
 		ID:            participant.ID,
 		CertificateID: participant.CertificateID,
-		Isrevoke:      participant.Isrevoke,
+		IsRevoke:      participant.Isrevoke,
+		IsDistributed: participant.IsDistributed,
 		CreatedAt:     participant.CreatedAt,
 		UpdatedAt:     time.Now(), // Use current time for updated_at
 		DynamicData:   newData,
@@ -244,4 +247,3 @@ func DeleteParticipantByID(participantID string) (*model.Participant, error) {
 	slog.Info("ParticipantModel DeleteParticipantByID completed", "participant_id", participantID, "cert_id", certId)
 	return participant, nil
 }
-

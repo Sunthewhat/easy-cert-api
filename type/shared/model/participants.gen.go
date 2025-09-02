@@ -17,6 +17,7 @@ type Participant struct {
 	Isrevoke      bool      `gorm:"column:isrevoke;not null" json:"isrevoke"`
 	CreatedAt     time.Time `gorm:"column:created_at;not null;default:now()" json:"created_at"`
 	UpdatedAt     time.Time `gorm:"column:updated_at;not null;default:now()" json:"updated_at"`
+	IsDistributed bool      `gorm:"column:is_distributed" json:"is_distributed"`
 }
 
 // TableName Participant's table name

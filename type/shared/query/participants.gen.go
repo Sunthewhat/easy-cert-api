@@ -32,6 +32,7 @@ func newParticipant(db *gorm.DB, opts ...gen.DOOption) participant {
 	_participant.Isrevoke = field.NewBool(tableName, "isrevoke")
 	_participant.CreatedAt = field.NewTime(tableName, "created_at")
 	_participant.UpdatedAt = field.NewTime(tableName, "updated_at")
+	_participant.IsDistributed = field.NewBool(tableName, "is_distributed")
 
 	_participant.fillFieldMap()
 
@@ -47,6 +48,7 @@ type participant struct {
 	Isrevoke      field.Bool
 	CreatedAt     field.Time
 	UpdatedAt     field.Time
+	IsDistributed field.Bool
 
 	fieldMap map[string]field.Expr
 }
@@ -68,6 +70,7 @@ func (p *participant) updateTableName(table string) *participant {
 	p.Isrevoke = field.NewBool(table, "isrevoke")
 	p.CreatedAt = field.NewTime(table, "created_at")
 	p.UpdatedAt = field.NewTime(table, "updated_at")
+	p.IsDistributed = field.NewBool(table, "is_distributed")
 
 	p.fillFieldMap()
 
@@ -84,12 +87,13 @@ func (p *participant) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (p *participant) fillFieldMap() {
-	p.fieldMap = make(map[string]field.Expr, 5)
+	p.fieldMap = make(map[string]field.Expr, 6)
 	p.fieldMap["id"] = p.ID
 	p.fieldMap["certificate_id"] = p.CertificateID
 	p.fieldMap["isrevoke"] = p.Isrevoke
 	p.fieldMap["created_at"] = p.CreatedAt
 	p.fieldMap["updated_at"] = p.UpdatedAt
+	p.fieldMap["is_distributed"] = p.IsDistributed
 }
 
 func (p participant) clone(db *gorm.DB) participant {
