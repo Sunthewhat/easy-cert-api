@@ -4,7 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
+	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -46,5 +46,12 @@ func Update(c *fiber.Ctx) error {
 	}
 
 	slog.Info("Certificate Update successful", "cert_id", id, "cert_name", updatedCert.Name)
+
+	thumbnailErr := util.RenderCertificateThumbnail(updatedCert)
+
+	if thumbnailErr != nil {
+		return response.SendInternalError(c, thumbnailErr)
+	}
+
 	return response.SendSuccess(c, "Certificate updated successfully", updatedCert)
 }

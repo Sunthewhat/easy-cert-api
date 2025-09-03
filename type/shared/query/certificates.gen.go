@@ -33,6 +33,7 @@ func newCertificate(db *gorm.DB, opts ...gen.DOOption) certificate {
 	_certificate.UserID = field.NewString(tableName, "user_id")
 	_certificate.CreatedAt = field.NewTime(tableName, "created_at")
 	_certificate.UpdatedAt = field.NewTime(tableName, "updated_at")
+	_certificate.ThumbnailURL = field.NewString(tableName, "thumbnail_url")
 
 	_certificate.fillFieldMap()
 
@@ -42,13 +43,14 @@ func newCertificate(db *gorm.DB, opts ...gen.DOOption) certificate {
 type certificate struct {
 	certificateDo
 
-	ALL       field.Asterisk
-	ID        field.String
-	Name      field.String
-	Design    field.String
-	UserID    field.String
-	CreatedAt field.Time
-	UpdatedAt field.Time
+	ALL          field.Asterisk
+	ID           field.String
+	Name         field.String
+	Design       field.String
+	UserID       field.String
+	CreatedAt    field.Time
+	UpdatedAt    field.Time
+	ThumbnailURL field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -71,6 +73,7 @@ func (c *certificate) updateTableName(table string) *certificate {
 	c.UserID = field.NewString(table, "user_id")
 	c.CreatedAt = field.NewTime(table, "created_at")
 	c.UpdatedAt = field.NewTime(table, "updated_at")
+	c.ThumbnailURL = field.NewString(table, "thumbnail_url")
 
 	c.fillFieldMap()
 
@@ -87,13 +90,14 @@ func (c *certificate) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (c *certificate) fillFieldMap() {
-	c.fieldMap = make(map[string]field.Expr, 6)
+	c.fieldMap = make(map[string]field.Expr, 7)
 	c.fieldMap["id"] = c.ID
 	c.fieldMap["name"] = c.Name
 	c.fieldMap["design"] = c.Design
 	c.fieldMap["user_id"] = c.UserID
 	c.fieldMap["created_at"] = c.CreatedAt
 	c.fieldMap["updated_at"] = c.UpdatedAt
+	c.fieldMap["thumbnail_url"] = c.ThumbnailURL
 }
 
 func (c certificate) clone(db *gorm.DB) certificate {

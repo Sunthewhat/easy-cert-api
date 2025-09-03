@@ -36,5 +36,11 @@ func Create(c *fiber.Ctx) error {
 		return response.SendInternalError(c, err)
 	}
 
+	thumbnailErr := util.RenderCertificateThumbnail(newCert)
+
+	if thumbnailErr != nil {
+		return response.SendInternalError(c, thumbnailErr)
+	}
+
 	return response.SendSuccess(c, "Certificate Created", newCert)
 }

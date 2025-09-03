@@ -21,3 +21,8 @@ type RenderCertificatePayload struct {
 	Results     []renderCertificateResult `json:"results"`
 	ZipFilePath string                    `json:"zipFilePath"`
 }
+
+type RenderThumbnailPayload struct {
+	Message       string `json:"message"`
+	ThumbnailPath string `json:"thumbnailPath"`
+}

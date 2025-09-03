@@ -125,3 +125,11 @@ func Update(id string, name string, design string) (*model.Certificate, error) {
 
 	return updatedCert, nil
 }
+
+func AddThumbnailUrl(certificateId string, thumbnailUrl string) error {
+	_, queryErr := common.Gorm.Certificate.Where(common.Gorm.Certificate.ID.Eq(certificateId)).Update(common.Gorm.Certificate.ThumbnailURL, thumbnailUrl)
+	if queryErr != nil {
+		slog.Error("Add ThumbnailUrl to certificate failed", "error", queryErr)
+	}
+	return nil
+}
