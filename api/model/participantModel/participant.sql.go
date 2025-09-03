@@ -148,3 +148,13 @@ func UpdateParticipantCertificateUrlInPostgres(participantId string, certificate
 	slog.Info("ParticipantModel updateParticipantCertificateUrlInPostgres success", "participantId", participantId)
 	return nil
 }
+
+func MarkParticipantAsDistributed(participantId string) error {
+	_, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantId)).Update(common.Gorm.Participant.IsDistributed, true)
+	if err != nil {
+		slog.Error("Participant Model Mark Participant As Distributed Failed", "error", err, "participantId", participantId)
+		return err
+	}
+	slog.Info("ParticipantModel Mark Participant as Distributed success")
+	return nil
+}

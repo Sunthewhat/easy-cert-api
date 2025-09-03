@@ -31,12 +31,13 @@ func main() {
 
 	gorm.InitGorm()
 	mongo.InitMongo()
-	
+	util.InitDialer()
+
 	if err := util.InitMinIO(); err != nil {
 		slog.Error("Failed to initialize MinIO", "error", err)
 	} else {
 		slog.Info("MinIO initialized successfully")
 	}
-	
+
 	api.InitFiber()
 }

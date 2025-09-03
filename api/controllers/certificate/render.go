@@ -76,11 +76,12 @@ func Render(c *fiber.Ctx) error {
 	slog.Info("Certificate Render sending request to renderer",
 		"cert_id", certId,
 		"renderer_url", rendererURL,
-		"participant_count", len(participants))
+		"participant_count", len(participants),
+		"estimated_time", "This may take several minutes for large batches")
 
-	// Create HTTP client with timeout
+	// Create HTTP client with extended timeout for rendering
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: 300 * time.Second, // 5 minutes timeout for rendering
 	}
 
 	// Create POST request

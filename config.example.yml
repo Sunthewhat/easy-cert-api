@@ -30,3 +30,9 @@ sso_issuer_url: http:sso.com
 sso_client: client
 
 sso_secret: secret
+
+mail_host: smtp.com
+
+mail_user: mail@com
+
+mail_pass: securepass

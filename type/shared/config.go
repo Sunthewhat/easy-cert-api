@@ -17,4 +17,7 @@ type Config struct {
 	SsoIssuerUrl      *string   `yaml:"sso_issuer_url" validate:"required"`
 	SsoClient         *string   `yaml:"sso_client" validate:"required"`
 	SsoSecret         *string   `yaml:"sso_secret" validate:"required"`
+	MailHost          *string   `yaml:"mail_host" validate:"required"`
+	MailUser          *string   `yaml:"mail_user" validate:"required"`
+	MailPass          *string   `yaml:"mail_pass" validate:"required"`
 }
