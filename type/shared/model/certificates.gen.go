@@ -19,6 +19,7 @@ type Certificate struct {
 	CreatedAt    time.Time `gorm:"column:created_at;not null;default:now()" json:"created_at"`
 	UpdatedAt    time.Time `gorm:"column:updated_at;not null;default:now()" json:"updated_at"`
 	ThumbnailURL string    `gorm:"column:thumbnail_url" json:"thumbnail_url"`
+	ArchiveURL   string    `gorm:"column:archive_url" json:"archive_url"`
 }
 
 // TableName Certificate's table name
