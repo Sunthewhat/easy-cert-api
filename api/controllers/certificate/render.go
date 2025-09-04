@@ -120,7 +120,7 @@ func Render(c *fiber.Ctx) error {
 		// Try to parse response as JSON
 		var rendererResponse payload.RenderCertificatePayload
 		if parseErr := json.Unmarshal(responseBody, &rendererResponse); parseErr == nil {
-			certificatemodel.EditArchiveUrl(certId, rendererResponse.ZipFilePath)
+			certificatemodel.EditArchiveUrl(certId, fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, *common.Config.BucketCertificate, rendererResponse.ZipFilePath))
 			// Update participant certificate URLs
 			for _, result := range rendererResponse.Results {
 				if result.Status == "success" && result.FilePath != "" {
