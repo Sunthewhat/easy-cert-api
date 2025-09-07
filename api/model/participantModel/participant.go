@@ -155,6 +155,37 @@ func GetParticipantsByCertId(certId string) ([]*CombinedParticipant, error) {
 	return combinedParticipants, nil
 }
 
+// Get participant by participant id
+func GetParticipantsById(participantId string) (*CombinedParticipant, error) {
+	participant, err := GetParticipantByIdFromPostgres(participantId)
+	if err != nil {
+		return nil, err
+	}
+	participantData, err := GetParticipantByIdFromMongo(participant.CertificateID, participantId)
+	if err != nil {
+		return nil, err
+	}
+
+	combinedParticipant := &CombinedParticipant{
+		ID:             participant.ID,
+		CertificateID:  participant.CertificateID,
+		IsRevoke:       participant.Isrevoke,
+		IsDistributed:  participant.IsDistributed,
+		CertificateURL: participant.CertificateURL,
+		CreatedAt:      participant.CreatedAt,
+		UpdatedAt:      participant.UpdatedAt,
+		DynamicData:    make(map[string]any),
+	}
+
+	for key, value := range participantData {
+		if key != "_id" && key != "certificate_id" {
+			combinedParticipant.DynamicData[key] = value
+		}
+	}
+
+	return combinedParticipant, nil
+}
+
 // DeleteByCertId deletes participants from both PostgreSQL and MongoDB for a certificate
 func DeleteByCertId(certId string) ([]*model.Participant, error) {
 	// Delete from PostgreSQL first

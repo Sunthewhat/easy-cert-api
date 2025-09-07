@@ -56,6 +56,29 @@ func GetParticipantsByMongo(certId string) ([]map[string]any, error) {
 	return participants, nil
 }
 
+// GetParticipantByIdFromMongo returns a specific participant from MongoDB by participant ID
+func GetParticipantByIdFromMongo(certId string, participantID string) (map[string]any, error) {
+	collectionName := "participant-" + certId
+	collection := common.Mongo.Collection(collectionName)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var participant map[string]any
+	err := collection.FindOne(ctx, bson.M{"_id": participantID}).Decode(&participant)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			slog.Warn("ParticipantModel GetParticipantByIdFromMongo: participant not found", "cert_id", certId, "participant_id", participantID)
+			return nil, fmt.Errorf("participant not found")
+		}
+		slog.Error("ParticipantModel GetParticipantByIdFromMongo failed", "error", err, "cert_id", certId, "participant_id", participantID)
+		return nil, err
+	}
+
+	slog.Info("ParticipantModel GetParticipantByIdFromMongo", "cert_id", certId, "participant_id", participantID)
+	return participant, nil
+}
+
 // addParticipantsToMongo handles MongoDB insertion with generated IDs
 func addParticipantsToMongo(certId string, participants []map[string]any, participantIDs []string) (*mongo.InsertManyResult, error) {
 	collectionName := "participant-" + certId

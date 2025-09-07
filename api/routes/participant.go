@@ -9,6 +9,8 @@ import (
 func SetupParticipantRoutes(router fiber.Router) {
 	participantGroup := router.Group("participant")
 
+	participantGroup.Get("validation/:participantId", participant_controller.GetValidationDataByParticipantId)
+
 	participantGroup.Use(middleware.AuthMiddleware())
 
 	participantGroup.Get(":certId", participant_controller.GetByCert)
