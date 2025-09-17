@@ -1,28 +1,22 @@
 package gorm
 
 import (
-	"log"
 	"log/slog"
 	"os"
 	"time"
 
+	slogGorm "github.com/orandin/slog-gorm"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/type/shared/query"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 func InitGorm() {
-	// Configure Configuration file
-	lg := logger.New(
-		log.New(os.Stdout, "\r\n", log.LstdFlags),
-		logger.Config{
-			SlowThreshold:             100 * time.Millisecond,
-			LogLevel:                  logger.Info,
-			IgnoreRecordNotFoundError: true,
-			Colorful:                  true,
-		},
+	// Configure slog-gorm logger
+	lg := slogGorm.New(
+		slogGorm.WithHandler(slog.Default().Handler()),
+		slogGorm.WithSlowThreshold(100*time.Millisecond),
 	)
 
 	// Config GORM Connector

@@ -18,4 +18,5 @@ func SetupCertificateRoutes(router fiber.Router) {
 	certificateGroup.Delete(":certId", certificate_controller.Delete)
 	certificateGroup.Post("render/:certId", certificate_controller.Render)
 	certificateGroup.Get("mail/:certId", certificate_controller.DistributeByMail)
+	certificateGroup.Get("anchor/:certId", certificate_controller.GetAnchorList)
 }
