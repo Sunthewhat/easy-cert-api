@@ -35,6 +35,7 @@ func newCertificate(db *gorm.DB, opts ...gen.DOOption) certificate {
 	_certificate.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_certificate.ThumbnailURL = field.NewString(tableName, "thumbnail_url")
 	_certificate.ArchiveURL = field.NewString(tableName, "archive_url")
+	_certificate.IsDistributed = field.NewBool(tableName, "is_distributed")
 
 	_certificate.fillFieldMap()
 
@@ -44,15 +45,16 @@ func newCertificate(db *gorm.DB, opts ...gen.DOOption) certificate {
 type certificate struct {
 	certificateDo
 
-	ALL          field.Asterisk
-	ID           field.String
-	Name         field.String
-	Design       field.String
-	UserID       field.String
-	CreatedAt    field.Time
-	UpdatedAt    field.Time
-	ThumbnailURL field.String
-	ArchiveURL   field.String
+	ALL           field.Asterisk
+	ID            field.String
+	Name          field.String
+	Design        field.String
+	UserID        field.String
+	CreatedAt     field.Time
+	UpdatedAt     field.Time
+	ThumbnailURL  field.String
+	ArchiveURL    field.String
+	IsDistributed field.Bool
 
 	fieldMap map[string]field.Expr
 }
@@ -77,6 +79,7 @@ func (c *certificate) updateTableName(table string) *certificate {
 	c.UpdatedAt = field.NewTime(table, "updated_at")
 	c.ThumbnailURL = field.NewString(table, "thumbnail_url")
 	c.ArchiveURL = field.NewString(table, "archive_url")
+	c.IsDistributed = field.NewBool(table, "is_distributed")
 
 	c.fillFieldMap()
 
@@ -93,7 +96,7 @@ func (c *certificate) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (c *certificate) fillFieldMap() {
-	c.fieldMap = make(map[string]field.Expr, 8)
+	c.fieldMap = make(map[string]field.Expr, 9)
 	c.fieldMap["id"] = c.ID
 	c.fieldMap["name"] = c.Name
 	c.fieldMap["design"] = c.Design
@@ -102,6 +105,7 @@ func (c *certificate) fillFieldMap() {
 	c.fieldMap["updated_at"] = c.UpdatedAt
 	c.fieldMap["thumbnail_url"] = c.ThumbnailURL
 	c.fieldMap["archive_url"] = c.ArchiveURL
+	c.fieldMap["is_distributed"] = c.IsDistributed
 }
 
 func (c certificate) clone(db *gorm.DB) certificate {
