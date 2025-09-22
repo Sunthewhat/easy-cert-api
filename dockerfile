@@ -35,7 +35,12 @@ RUN apk --no-cache add \
     g++ \
     curl \
     unzip \
-    bash
+    bash \
+    fontconfig \
+    ttf-dejavu \
+    ttf-droid \
+    ttf-freefont \
+    ttf-liberation
 
 # Install Bun
 RUN curl -fsSL https://bun.sh/install | bash

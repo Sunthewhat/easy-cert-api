@@ -221,6 +221,22 @@ async function loadCanvasWithImageFallback(designStr: string): Promise<fabric.Ca
 		enableRetinaScaling: true, // Enable retina/high-DPI scaling
 	});
 
+	// Add font fallbacks for production environment
+	if (design.objects && Array.isArray(design.objects)) {
+		design.objects = design.objects.map((obj: any) => {
+			if (obj.type === 'Textbox' || obj.type === 'textbox' || obj.type === 'Text' || obj.type === 'text') {
+				// Ensure font fallbacks for production
+				if (obj.fontFamily && !obj.fontFamily.includes(',')) {
+					obj.fontFamily = `${obj.fontFamily}, Arial, sans-serif`;
+				} else if (!obj.fontFamily) {
+					obj.fontFamily = 'Arial, sans-serif';
+				}
+				console.error(`DEBUG: Text object font: ${obj.fontFamily}, text: "${obj.text}"`);
+			}
+			return obj;
+		});
+	}
+
 	// Load design into canvas
 	await new Promise<void>((resolve) => {
 		canvas.loadFromJSON(
