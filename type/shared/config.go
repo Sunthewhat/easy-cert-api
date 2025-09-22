@@ -20,4 +20,7 @@ type Config struct {
 	MailHost          *string   `yaml:"mail_host" validate:"required"`
 	MailUser          *string   `yaml:"mail_user" validate:"required"`
 	MailPass          *string   `yaml:"mail_pass" validate:"required"`
+	SigningEnabled    *bool     `yaml:"signing_enabled"`
+	SigningCertPath   *string   `yaml:"signing_cert_path"`
+	SigningKeyPath    *string   `yaml:"signing_key_path"`
 }

@@ -66,9 +66,17 @@ type CertificateResult struct {
 type EmbeddedRenderer struct {
 	rendererDir string
 	minIO       *minio.Client
+	signer      *CertificateSigner
 }
 
 func NewEmbeddedRenderer() (*EmbeddedRenderer, error) {
+	// Initialize PDF signer
+	signer, err := NewCertificateSigner()
+	if err != nil {
+		slog.Warn("Failed to initialize PDF signer, signatures will be disabled", "error", err)
+		signer = &CertificateSigner{enabled: false}
+	}
+
 	// Try Docker pre-installed path first
 	dockerRendererDir := "/root/internal/renderer"
 	if _, err := os.Stat(dockerRendererDir); err == nil {
@@ -79,6 +87,7 @@ func NewEmbeddedRenderer() (*EmbeddedRenderer, error) {
 			return &EmbeddedRenderer{
 				rendererDir: dockerRendererDir,
 				minIO:       common.MinIOClient,
+				signer:      signer,
 			}, nil
 		}
 	}
@@ -93,6 +102,7 @@ func NewEmbeddedRenderer() (*EmbeddedRenderer, error) {
 			return &EmbeddedRenderer{
 				rendererDir: localRendererDir,
 				minIO:       common.MinIOClient,
+				signer:      signer,
 			}, nil
 		}
 	}
@@ -131,6 +141,7 @@ func NewEmbeddedRenderer() (*EmbeddedRenderer, error) {
 	return &EmbeddedRenderer{
 		rendererDir: tempDir,
 		minIO:       common.MinIOClient,
+		signer:      signer,
 	}, nil
 }
 
@@ -597,7 +608,7 @@ func (r *EmbeddedRenderer) GenerateAccessibleURL(bucketName, objectName string) 
 	return fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, bucketName, objectName)
 }
 
-func (r *EmbeddedRenderer) ConvertToPDF(imageBase64 string, participantID string) ([]byte, error) {
+func (r *EmbeddedRenderer) ConvertToPDF(imageBase64 string, participantID string, certificateID string) ([]byte, error) {
 	// Decode base64 image
 	imageBytes, err := base64.StdEncoding.DecodeString(imageBase64)
 	if err != nil {
@@ -633,7 +644,36 @@ func (r *EmbeddedRenderer) ConvertToPDF(imageBase64 string, participantID string
 		return nil, fmt.Errorf("failed to generate PDF: %w", err)
 	}
 
-	return buf.Bytes(), nil
+	pdfBytes := buf.Bytes()
+
+	// Sign the PDF if signer is available and enabled
+	if r.signer != nil && r.signer.IsEnabled() {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("Panic occurred during PDF signing in ConvertToPDF",
+						"panic", r,
+						"cert_id", certificateID,
+						"participant_id", participantID)
+				}
+			}()
+
+			signedPDF, err := r.signer.SignPDF(pdfBytes, certificateID, participantID)
+			if err != nil {
+				slog.Warn("Failed to sign PDF, returning unsigned version",
+					"error", err,
+					"cert_id", certificateID,
+					"participant_id", participantID)
+				return
+			}
+
+			if len(signedPDF) > 0 {
+				pdfBytes = signedPDF
+			}
+		}()
+	}
+
+	return pdfBytes, nil
 }
 
 func (r *EmbeddedRenderer) UploadToMinIO(data []byte, filename string) (string, error) {
@@ -748,7 +788,7 @@ func (r *EmbeddedRenderer) ProcessCertificates(ctx context.Context, certificate 
 		}
 
 		// Convert to PDF
-		pdfBytes, err := r.ConvertToPDF(renderResult.ImageBase64, renderResult.ParticipantID)
+		pdfBytes, err := r.ConvertToPDF(renderResult.ImageBase64, renderResult.ParticipantID, certificateID)
 		if err != nil {
 			slog.Error("Failed to convert to PDF", "participant_id", renderResult.ParticipantID, "error", err)
 			certificateResults = append(certificateResults, CertificateResult{
