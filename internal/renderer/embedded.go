@@ -64,12 +64,40 @@ type CertificateResult struct {
 }
 
 type EmbeddedRenderer struct {
-	tempDir string
-	minIO   *minio.Client
+	rendererDir string
+	minIO       *minio.Client
 }
 
 func NewEmbeddedRenderer() (*EmbeddedRenderer, error) {
-	// Create temporary directory for Bun assets
+	// Try Docker pre-installed path first
+	dockerRendererDir := "/root/internal/renderer"
+	if _, err := os.Stat(dockerRendererDir); err == nil {
+		// Verify node_modules exists
+		nodeModulesPath := filepath.Join(dockerRendererDir, "node_modules")
+		if _, err := os.Stat(nodeModulesPath); err == nil {
+			slog.Info("Using Docker pre-installed embedded renderer", "renderer_dir", dockerRendererDir)
+			return &EmbeddedRenderer{
+				rendererDir: dockerRendererDir,
+				minIO:       common.MinIOClient,
+			}, nil
+		}
+	}
+
+	// Try local development pre-installed path
+	localRendererDir := "internal/renderer"
+	if _, err := os.Stat(localRendererDir); err == nil {
+		// Verify node_modules exists
+		nodeModulesPath := filepath.Join(localRendererDir, "node_modules")
+		if _, err := os.Stat(nodeModulesPath); err == nil {
+			slog.Info("Using local pre-installed embedded renderer", "renderer_dir", localRendererDir)
+			return &EmbeddedRenderer{
+				rendererDir: localRendererDir,
+				minIO:       common.MinIOClient,
+			}, nil
+		}
+	}
+
+	// Final fallback - create temp directory and install fresh dependencies
 	tempDir, err := os.MkdirTemp("", "easy-cert-renderer-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
@@ -86,8 +114,9 @@ func NewEmbeddedRenderer() (*EmbeddedRenderer, error) {
 		return nil, fmt.Errorf("failed to write package.json: %w", err)
 	}
 
-	// Install Bun dependencies
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// Install Bun dependencies as final fallback
+	slog.Info("Fallback mode - installing Bun dependencies fresh", "temp_dir", tempDir)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	installCmd := exec.CommandContext(ctx, "bun", "install")
@@ -97,11 +126,11 @@ func NewEmbeddedRenderer() (*EmbeddedRenderer, error) {
 		return nil, fmt.Errorf("failed to install Bun dependencies: %w", err)
 	}
 
-	slog.Info("Embedded renderer initialized", "temp_dir", tempDir)
+	slog.Info("Fallback embedded renderer initialized", "temp_dir", tempDir)
 
 	return &EmbeddedRenderer{
-		tempDir: tempDir,
-		minIO:   common.MinIOClient,
+		rendererDir: tempDir,
+		minIO:       common.MinIOClient,
 	}, nil
 }
 
@@ -129,9 +158,13 @@ type QRJob struct {
 }
 
 func (r *EmbeddedRenderer) Close() {
-	if r.tempDir != "" {
-		os.RemoveAll(r.tempDir)
-		slog.Info("Embedded renderer cleaned up", "temp_dir", r.tempDir)
+	// Only cleanup if using temporary directory (fallback mode)
+	if r.rendererDir != "/root/internal/renderer" && r.rendererDir != "internal/renderer" && r.rendererDir != "" {
+		// This is a temporary directory, safe to remove
+		os.RemoveAll(r.rendererDir)
+		slog.Info("Embedded renderer cleaned up", "temp_dir", r.rendererDir)
+	} else {
+		slog.Info("Embedded renderer cleanup (no action needed for pre-installed directory)")
 	}
 }
 
@@ -318,7 +351,7 @@ func (r *EmbeddedRenderer) RenderCertificates(ctx context.Context, certificate a
 
 	// Execute Bun renderer
 	cmd := exec.CommandContext(ctx, "bun", "renderer.ts")
-	cmd.Dir = r.tempDir
+	cmd.Dir = r.rendererDir
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -385,7 +418,7 @@ func (r *EmbeddedRenderer) RenderThumbnail(ctx context.Context, certificate any)
 
 	// Execute Bun renderer for thumbnail
 	cmd := exec.CommandContext(ctx, "bun", "renderer.ts")
-	cmd.Dir = r.tempDir
+	cmd.Dir = r.rendererDir
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
