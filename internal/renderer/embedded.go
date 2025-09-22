@@ -1,0 +1,629 @@
+package renderer
+
+import (
+	"archive/zip"
+	"bytes"
+	"context"
+	_ "embed"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jung-kurt/gofpdf"
+	"github.com/minio/minio-go/v7"
+	"github.com/skip2/go-qrcode"
+	"github.com/sunthewhat/easy-cert-api/common"
+)
+
+//go:embed renderer.ts
+var rendererScript string
+
+//go:embed package.json
+var packageJSON string
+
+type RenderRequest struct {
+	Certificate  any               `json:"certificate"`
+	Participants []any             `json:"participants"`
+	QRCodes      map[string]string `json:"qrCodes,omitempty"`
+}
+
+type ThumbnailRequest struct {
+	Certificate any    `json:"certificate"`
+	Mode        string `json:"mode"`
+}
+
+type RenderResult struct {
+	ParticipantID string `json:"participantId"`
+	ImageBase64   string `json:"imageBase64"`
+	Status        string `json:"status"`
+	Error         string `json:"error,omitempty"`
+}
+
+type ThumbnailResult struct {
+	ImageBase64 string `json:"imageBase64"`
+	Status      string `json:"status"`
+	Error       string `json:"error,omitempty"`
+}
+
+type CertificateResult struct {
+	ParticipantID string `json:"participantId"`
+	FilePath      string `json:"filePath"`
+	Status        string `json:"status"`
+	Error         string `json:"error,omitempty"`
+}
+
+type EmbeddedRenderer struct {
+	tempDir string
+	minIO   *minio.Client
+}
+
+func NewEmbeddedRenderer() (*EmbeddedRenderer, error) {
+	// Create temporary directory for Bun assets
+	tempDir, err := os.MkdirTemp("", "easy-cert-renderer-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	// Write renderer script and package.json to temp directory
+	if err := os.WriteFile(filepath.Join(tempDir, "renderer.ts"), []byte(rendererScript), 0644); err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to write renderer script: %w", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(tempDir, "package.json"), []byte(packageJSON), 0644); err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to write package.json: %w", err)
+	}
+
+	// Install Bun dependencies
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	installCmd := exec.CommandContext(ctx, "bun", "install")
+	installCmd.Dir = tempDir
+	if err := installCmd.Run(); err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to install Bun dependencies: %w", err)
+	}
+
+	slog.Info("Embedded renderer initialized", "temp_dir", tempDir)
+
+	return &EmbeddedRenderer{
+		tempDir: tempDir,
+		minIO:   common.MinIOClient,
+	}, nil
+}
+
+// Helper function to get map keys for debugging
+func getMapKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (r *EmbeddedRenderer) Close() {
+	if r.tempDir != "" {
+		os.RemoveAll(r.tempDir)
+		slog.Info("Embedded renderer cleaned up", "temp_dir", r.tempDir)
+	}
+}
+
+func (r *EmbeddedRenderer) GenerateQRCodes(participants []any, certificateID string) map[string]string {
+	qrCodes := make(map[string]string)
+
+	for i, p := range participants {
+		slog.Info("Processing participant for QR code", "index", i, "participant_type", fmt.Sprintf("%T", p), "participant_data", p)
+
+		var participantID string
+
+		// Try to extract participant ID using reflection for different types
+		participantValue := reflect.ValueOf(p)
+		if participantValue.Kind() == reflect.Ptr {
+			participantValue = participantValue.Elem()
+		}
+
+		if participantValue.Kind() == reflect.Struct {
+			// Handle struct (likely CombinedParticipant)
+			idField := participantValue.FieldByName("ID")
+			if idField.IsValid() && idField.Kind() == reflect.String {
+				participantID = idField.String()
+				slog.Info("Extracted participant ID from struct", "participant_id", participantID)
+			} else {
+				slog.Warn("Failed to extract ID from struct", "index", i, "struct_type", participantValue.Type())
+				continue
+			}
+		} else if participantMap, ok := p.(map[string]any); ok {
+			// Handle map[string]any
+			if id, exists := participantMap["id"].(string); exists {
+				participantID = id
+				slog.Info("Extracted participant ID from map", "participant_id", participantID)
+			} else {
+				slog.Warn("Failed to extract participant ID from map", "index", i, "participant_keys", getMapKeys(participantMap), "participant", participantMap)
+				continue
+			}
+		} else {
+			slog.Warn("Participant is neither struct nor map", "index", i, "type", fmt.Sprintf("%T", p), "data", p)
+			continue
+		}
+
+		if participantID == "" {
+			slog.Warn("Participant ID is empty", "index", i)
+			continue
+		}
+
+		// Generate verification URL (modify as needed)
+		verifyURL := fmt.Sprintf("%s/validate/result/%s", *common.Config.VerifyHost, participantID)
+		slog.Info("Generating QR code", "participant_id", participantID, "verify_url", verifyURL)
+
+		// Generate QR code
+		qrBytes, err := qrcode.Encode(verifyURL, qrcode.Medium, 100)
+		if err != nil {
+			slog.Warn("Failed to generate QR code", "participant_id", participantID, "error", err)
+			continue
+		}
+
+		// Convert to base64
+		qrBase64 := base64.StdEncoding.EncodeToString(qrBytes)
+		qrCodes[participantID] = qrBase64
+	}
+
+	return qrCodes
+}
+
+func (r *EmbeddedRenderer) RenderCertificates(ctx context.Context, certificate any, participants []any) ([]RenderResult, error) {
+	// Generate QR codes
+	certMap, ok := certificate.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid certificate format")
+	}
+
+	certificateID, _ := certMap["id"].(string)
+	qrCodes := r.GenerateQRCodes(participants, certificateID)
+
+	// Debug: Log QR codes generation
+	slog.Info("Generated QR codes", "certificate_id", certificateID, "qr_count", len(qrCodes))
+	for participantID, qrCode := range qrCodes {
+		slog.Info("QR code generated", "participant_id", participantID, "qr_length", len(qrCode))
+	}
+
+	// Prepare request
+	request := RenderRequest{
+		Certificate:  certificate,
+		Participants: participants,
+		QRCodes:      qrCodes,
+	}
+
+	requestJSON, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Execute Bun renderer
+	cmd := exec.CommandContext(ctx, "bun", "renderer.ts")
+	cmd.Dir = r.tempDir
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start Bun renderer: %w", err)
+	}
+
+	// Send request data
+	go func() {
+		defer stdin.Close()
+		stdin.Write(requestJSON)
+	}()
+
+	// Read output
+	outputBytes, err := io.ReadAll(stdout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read stdout: %w", err)
+	}
+
+	errorBytes, err := io.ReadAll(stderr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read stderr: %w", err)
+	}
+
+	// Wait for command to finish
+	if err := cmd.Wait(); err != nil {
+		return nil, fmt.Errorf("bun renderer failed: %w, stderr: %s", err, string(errorBytes))
+	}
+
+	// Parse results
+	var results []RenderResult
+	if err := json.Unmarshal(outputBytes, &results); err != nil {
+		return nil, fmt.Errorf("failed to parse renderer output: %w, output: %s", err, string(outputBytes))
+	}
+
+	return results, nil
+}
+
+func (r *EmbeddedRenderer) RenderThumbnail(ctx context.Context, certificate any) (*ThumbnailResult, error) {
+	// Prepare thumbnail request
+	request := ThumbnailRequest{
+		Certificate: certificate,
+		Mode:        "thumbnail",
+	}
+
+	requestJSON, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal thumbnail request: %w", err)
+	}
+
+	// Execute Bun renderer for thumbnail
+	cmd := exec.CommandContext(ctx, "bun", "renderer.ts")
+	cmd.Dir = r.tempDir
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start Bun renderer: %w", err)
+	}
+
+	// Send request data
+	go func() {
+		defer stdin.Close()
+		stdin.Write(requestJSON)
+	}()
+
+	// Read output
+	outputBytes, err := io.ReadAll(stdout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read stdout: %w", err)
+	}
+
+	errorBytes, err := io.ReadAll(stderr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read stderr: %w", err)
+	}
+
+	// Wait for command to finish
+	if err := cmd.Wait(); err != nil {
+		return nil, fmt.Errorf("bun thumbnail renderer failed: %w, stderr: %s", err, string(errorBytes))
+	}
+
+	// Parse result
+	var result ThumbnailResult
+	if err := json.Unmarshal(outputBytes, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse thumbnail renderer output: %w, output: %s", err, string(outputBytes))
+	}
+
+	return &result, nil
+}
+
+func (r *EmbeddedRenderer) ProcessThumbnail(ctx context.Context, certificate any, certificateID string) (string, error) {
+	// Render thumbnail
+	thumbnailResult, err := r.RenderThumbnail(ctx, certificate)
+	if err != nil {
+		return "", fmt.Errorf("failed to render thumbnail: %w", err)
+	}
+
+	if thumbnailResult.Status != "success" {
+		return "", fmt.Errorf("thumbnail rendering failed: %s", thumbnailResult.Error)
+	}
+
+	// Decode base64 image
+	imageBytes, err := base64.StdEncoding.DecodeString(thumbnailResult.ImageBase64)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode base64 thumbnail: %w", err)
+	}
+
+	// Generate filename with certificate ID folder (using JPEG for smaller size)
+	timestamp := time.Now().Unix()
+	filename := fmt.Sprintf("%s/thumbnail_%d_%s.jpg", certificateID, timestamp, strings.ReplaceAll(uuid.New().String(), "-", ""))
+
+	// Upload to MinIO
+	bucketName := *common.Config.BucketCertificate
+
+	// Ensure bucket exists and has public read policy
+	if err := r.ensureBucketPublic(bucketName); err != nil {
+		slog.Warn("Failed to ensure bucket is public", "error", err, "bucket", bucketName)
+	}
+
+	_, err = r.minIO.PutObject(
+		context.Background(),
+		bucketName,
+		filename,
+		bytes.NewReader(imageBytes),
+		int64(len(imageBytes)),
+		minio.PutObjectOptions{
+			ContentType: "image/jpeg",
+		},
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to upload thumbnail to MinIO: %w", err)
+	}
+
+	// Generate the direct URL for debugging
+	directURL := fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, bucketName, filename)
+	slog.Info("Thumbnail uploaded to MinIO", "filename", filename, "directURL", directURL)
+
+	return filename, nil
+}
+
+// ensureBucketPublic sets the bucket policy to allow public read access
+func (r *EmbeddedRenderer) ensureBucketPublic(bucketName string) error {
+	// Check if bucket exists
+	exists, err := r.minIO.BucketExists(context.Background(), bucketName)
+	if err != nil {
+		return fmt.Errorf("failed to check bucket existence: %w", err)
+	}
+
+	// Create bucket if it doesn't exist
+	if !exists {
+		err = r.minIO.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create bucket: %w", err)
+		}
+	}
+
+	// Set public read policy
+	policy := fmt.Sprintf(`{
+		"Version": "2012-10-17",
+		"Statement": [
+			{
+				"Effect": "Allow",
+				"Principal": "*",
+				"Action": "s3:GetObject",
+				"Resource": "arn:aws:s3:::%s/*"
+			}
+		]
+	}`, bucketName)
+
+	err = r.minIO.SetBucketPolicy(context.Background(), bucketName, policy)
+	if err != nil {
+		return fmt.Errorf("failed to set bucket policy: %w", err)
+	}
+
+	return nil
+}
+
+// GenerateAccessibleURL creates a static URL for accessing MinIO objects
+func (r *EmbeddedRenderer) GenerateAccessibleURL(bucketName, objectName string) string {
+	// Return static URL - objects should be publicly accessible
+	return fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, bucketName, objectName)
+}
+
+func (r *EmbeddedRenderer) ConvertToPDF(imageBase64 string, participantID string) ([]byte, error) {
+	// Decode base64 image
+	imageBytes, err := base64.StdEncoding.DecodeString(imageBase64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base64 image: %w", err)
+	}
+
+	// Create temporary image file
+	tempFile, err := os.CreateTemp("", "cert-*.png")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp image file: %w", err)
+	}
+	defer os.Remove(tempFile.Name())
+	defer tempFile.Close()
+
+	if _, err := tempFile.Write(imageBytes); err != nil {
+		return nil, fmt.Errorf("failed to write temp image: %w", err)
+	}
+	tempFile.Close()
+
+	// Create PDF
+	pdf := gofpdf.New("L", "mm", "A4", "") // Landscape orientation for certificates
+	pdf.AddPage()
+
+	// Get page dimensions
+	pageWidth, pageHeight := pdf.GetPageSize()
+
+	// Add image to PDF (fit to page)
+	pdf.Image(tempFile.Name(), 0, 0, pageWidth, pageHeight, false, "", 0, "")
+
+	// Output PDF to buffer
+	var buf bytes.Buffer
+	if err := pdf.Output(&buf); err != nil {
+		return nil, fmt.Errorf("failed to generate PDF: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (r *EmbeddedRenderer) UploadToMinIO(data []byte, filename string) (string, error) {
+	return r.UploadToMinIOWithContentType(data, filename, "application/pdf")
+}
+
+func (r *EmbeddedRenderer) UploadToMinIOWithContentType(data []byte, filename string, contentType string) (string, error) {
+	bucketName := *common.Config.BucketCertificate
+
+	// Ensure bucket exists and has public read policy
+	if err := r.ensureBucketPublic(bucketName); err != nil {
+		slog.Warn("Failed to ensure bucket is public", "error", err, "bucket", bucketName)
+	}
+
+	_, err := r.minIO.PutObject(
+		context.Background(),
+		bucketName,
+		filename,
+		bytes.NewReader(data),
+		int64(len(data)),
+		minio.PutObjectOptions{
+			ContentType: contentType,
+		},
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to upload to MinIO: %w", err)
+	}
+
+	// Generate the direct URL for debugging
+	directURL := fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, bucketName, filename)
+	slog.Info("File uploaded to MinIO", "filename", filename, "contentType", contentType, "directURL", directURL)
+
+	return filename, nil
+}
+
+func (r *EmbeddedRenderer) CreateZipArchive(results []CertificateResult) ([]byte, error) {
+	var buf bytes.Buffer
+	zipWriter := zip.NewWriter(&buf)
+	defer zipWriter.Close()
+
+	for _, result := range results {
+		if result.Status != "success" || result.FilePath == "" {
+			continue
+		}
+
+		// Download file from MinIO
+		object, err := r.minIO.GetObject(
+			context.Background(),
+			*common.Config.BucketCertificate,
+			result.FilePath,
+			minio.GetObjectOptions{},
+		)
+		if err != nil {
+			slog.Warn("Failed to download file for ZIP", "file_path", result.FilePath, "error", err)
+			continue
+		}
+
+		data, err := io.ReadAll(object)
+		object.Close()
+		if err != nil {
+			slog.Warn("Failed to read file data for ZIP", "file_path", result.FilePath, "error", err)
+			continue
+		}
+
+		// Add to ZIP
+		filename := fmt.Sprintf("certificate_%s.pdf", result.ParticipantID)
+		zipFile, err := zipWriter.Create(filename)
+		if err != nil {
+			slog.Warn("Failed to create ZIP entry", "filename", filename, "error", err)
+			continue
+		}
+
+		if _, err := zipFile.Write(data); err != nil {
+			slog.Warn("Failed to write ZIP entry", "filename", filename, "error", err)
+			continue
+		}
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close ZIP writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (r *EmbeddedRenderer) ProcessCertificates(ctx context.Context, certificate any, participants []any) ([]CertificateResult, string, error) {
+	// Extract certificate ID
+	certMap, ok := certificate.(map[string]any)
+	if !ok {
+		return nil, "", fmt.Errorf("invalid certificate format for folder creation")
+	}
+	certificateID, _ := certMap["id"].(string)
+
+	// Render certificates
+	renderResults, err := r.RenderCertificates(ctx, certificate, participants)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to render certificates: %w", err)
+	}
+
+	var certificateResults []CertificateResult
+
+	// Process each rendered certificate
+	for _, renderResult := range renderResults {
+		if renderResult.Status != "success" {
+			certificateResults = append(certificateResults, CertificateResult{
+				ParticipantID: renderResult.ParticipantID,
+				Status:        "error",
+				Error:         renderResult.Error,
+			})
+			continue
+		}
+
+		// Convert to PDF
+		pdfBytes, err := r.ConvertToPDF(renderResult.ImageBase64, renderResult.ParticipantID)
+		if err != nil {
+			slog.Error("Failed to convert to PDF", "participant_id", renderResult.ParticipantID, "error", err)
+			certificateResults = append(certificateResults, CertificateResult{
+				ParticipantID: renderResult.ParticipantID,
+				Status:        "error",
+				Error:         fmt.Sprintf("PDF conversion failed: %v", err),
+			})
+			continue
+		}
+
+		// Generate filename with certificate ID folder
+		timestamp := time.Now().Unix()
+		filename := fmt.Sprintf("%s/certificate_%d_%s.pdf", certificateID, timestamp, strings.ReplaceAll(uuid.New().String(), "-", ""))
+
+		// Upload to MinIO
+		filePath, err := r.UploadToMinIO(pdfBytes, filename)
+		if err != nil {
+			slog.Error("Failed to upload PDF", "participant_id", renderResult.ParticipantID, "error", err)
+			certificateResults = append(certificateResults, CertificateResult{
+				ParticipantID: renderResult.ParticipantID,
+				Status:        "error",
+				Error:         fmt.Sprintf("Upload failed: %v", err),
+			})
+			continue
+		}
+
+		certificateResults = append(certificateResults, CertificateResult{
+			ParticipantID: renderResult.ParticipantID,
+			FilePath:      filePath,
+			Status:        "success",
+		})
+	}
+
+	// Create ZIP archive
+	zipBytes, err := r.CreateZipArchive(certificateResults)
+	if err != nil {
+		return certificateResults, "", fmt.Errorf("failed to create ZIP archive: %w", err)
+	}
+
+	// Upload ZIP to MinIO with correct content type
+	timestamp := time.Now().Unix()
+	zipFilename := fmt.Sprintf("%s/certificates_%d_%s.zip", certificateID, timestamp, strings.ReplaceAll(uuid.New().String(), "-", ""))
+
+	zipFilePath, err := r.UploadToMinIOWithContentType(zipBytes, zipFilename, "application/zip")
+	if err != nil {
+		return certificateResults, "", fmt.Errorf("failed to upload ZIP: %w", err)
+	}
+
+	return certificateResults, zipFilePath, nil
+}

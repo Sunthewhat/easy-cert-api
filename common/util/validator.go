@@ -11,7 +11,7 @@ func init() {
 }
 
 // ValidateStruct validates a struct using validator tags
-func ValidateStruct(s interface{}) error {
+func ValidateStruct(s any) error {
 	return validate.Struct(s)
 }
 

@@ -8,8 +8,10 @@ require (
 	github.com/gofiber/jwt/v3 v3.3.10
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/uuid v1.6.0
+	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/orandin/slog-gorm v1.4.0
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	go.mongodb.org/mongo-driver v1.17.3
 	golang.org/x/crypto v0.39.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
@@ -69,3 +71,5 @@ require (
 	gorm.io/driver/mysql v1.5.7 // indirect
 	gorm.io/hints v1.1.2 // indirect
 )
+
+replace github.com/jung-kurt/gofpdf/v2 => github.com/jung-kurt/gofpdf v1.16.2

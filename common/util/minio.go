@@ -28,6 +28,7 @@ func InitMinIO() error {
 	}
 
 	minioClient = client
+	common.MinIOClient = client
 	return nil
 }
 

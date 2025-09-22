@@ -17,6 +17,10 @@ func Update(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Certificate ID is required")
 	}
 
+	autoSaveQuery := c.Query("autosave")
+
+	isAutoSave := autoSaveQuery == "true"
+
 	// Parse request body
 	body := new(payload.UpdateCertificatePayload)
 	if err := c.BodyParser(body); err != nil {
@@ -47,10 +51,9 @@ func Update(c *fiber.Ctx) error {
 
 	slog.Info("Certificate Update successful", "cert_id", id, "cert_name", updatedCert.Name)
 
-	thumbnailErr := util.RenderCertificateThumbnail(updatedCert)
-
-	if thumbnailErr != nil {
-		return response.SendInternalError(c, thumbnailErr)
+	if !isAutoSave {
+		// Start thumbnail rendering in background - don't block the response
+		util.RenderCertificateThumbnailAsync(updatedCert)
 	}
 
 	return response.SendSuccess(c, "Certificate updated successfully", updatedCert)

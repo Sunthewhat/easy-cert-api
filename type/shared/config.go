@@ -8,7 +8,7 @@ type Config struct {
 	Postgres          *string   `yaml:"postgres" validate:"required"`
 	Mongo             *string   `yaml:"mongo" validate:"required"`
 	MongoDatabase     *string   `yaml:"mongo_database" validate:"required"`
-	RendererUrl       *string   `yaml:"renderer_url" validate:"required"`
+	VerifyHost        *string   `yaml:"verify_host" validate:"required"`
 	MinIoEndpoint     *string   `yaml:"minio_endpoint" validate:"required"`
 	MinIoAccessKey    *string   `yaml:"minio_access_key" validate:"required"`
 	MinIoSecretKey    *string   `yaml:"minio_secret_key" validate:"required"`

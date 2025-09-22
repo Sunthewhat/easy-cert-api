@@ -13,7 +13,7 @@ mongo: mongodb://certapp_user:secure_password@localhost:27017/certificate_app
 
 mongo_database: certificate_app
 
-renderer_url: http://example.com
+verify_host: http://example.com
 
 minio_endpoint: http://minio.sit.kmutt.ac.th
 

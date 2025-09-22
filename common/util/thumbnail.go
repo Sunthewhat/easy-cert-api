@@ -1,70 +1,72 @@
 package util
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"time"
 
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	"github.com/sunthewhat/easy-cert-api/common"
-	"github.com/sunthewhat/easy-cert-api/type/payload"
+	"github.com/sunthewhat/easy-cert-api/internal/renderer"
 	"github.com/sunthewhat/easy-cert-api/type/shared/model"
 )
 
 func RenderCertificateThumbnail(certificate *model.Certificate) error {
-	requestBody := map[string]any{
-		"certificate": certificate,
+	slog.Info("Render Thumbnail starting embedded renderer", "cert_id", certificate.ID)
+
+	// Initialize embedded renderer
+	embeddedRenderer, err := renderer.NewEmbeddedRenderer()
+	if err != nil {
+		slog.Error("Failed to initialize embedded renderer for thumbnail", "error", err, "cert_id", certificate.ID)
+		return fmt.Errorf("failed to initialize renderer: %w", err)
+	}
+	defer embeddedRenderer.Close()
+
+	// Create context with timeout (30 seconds for thumbnail)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Convert certificate struct to map for renderer compatibility
+	certMap := map[string]any{
+		"id":     certificate.ID,
+		"name":   certificate.Name,
+		"design": certificate.Design,
 	}
 
-	jsonData, marshalErr := json.Marshal(requestBody)
-	if marshalErr != nil {
-		slog.Error("Render Thumbnail Marshal Failed", "cert", certificate, "error", marshalErr)
-		return marshalErr
+	// Process thumbnail with embedded renderer
+	thumbnailPath, err := embeddedRenderer.ProcessThumbnail(ctx, certMap, certificate.ID)
+	if err != nil {
+		slog.Error("Embedded renderer thumbnail processing failed", "error", err, "cert_id", certificate.ID)
+		return fmt.Errorf("thumbnail processing failed: %w", err)
 	}
 
-	rendererUrl := fmt.Sprintf("%s/api/thumbnail", *common.Config.RendererUrl)
-
-	client := &http.Client{
-		Timeout: 300 * time.Second,
+	// Generate presigned URL for thumbnail access
+	thumbnailURL := embeddedRenderer.GenerateAccessibleURL(*common.Config.BucketCertificate, thumbnailPath)
+	err = certificatemodel.AddThumbnailUrl(certificate.ID, thumbnailURL)
+	if err != nil {
+		slog.Error("Failed to update certificate thumbnail URL", "error", err, "cert_id", certificate.ID, "thumbnail_path", thumbnailPath)
+		return fmt.Errorf("failed to update thumbnail URL: %w", err)
 	}
 
-	req, reqErr := http.NewRequest("POST", rendererUrl, bytes.NewBuffer(jsonData))
-	if reqErr != nil {
-		slog.Error("Render Thumbnail request creation failed", "error", reqErr)
-		return reqErr
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	resp, respErr := client.Do(req)
-	if respErr != nil {
-		slog.Error("Render Thumbnail HTTP request failed", "error", respErr)
-		return respErr
-	}
-
-	defer resp.Body.Close()
-
-	responseBody, readErr := io.ReadAll(resp.Body)
-	if readErr != nil {
-		slog.Error("Render Thumbnail response read failed", "error", readErr)
-		return readErr
-	}
-
-	if resp.StatusCode == 200 {
-		slog.Info("Render Thumbnail Sucessful")
-
-		var renderResponse payload.RenderThumbnailPayload
-		if parseErr := json.Unmarshal(responseBody, &renderResponse); parseErr == nil {
-			err := certificatemodel.AddThumbnailUrl(certificate.ID, fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, *common.Config.BucketCertificate, renderResponse.ThumbnailPath))
-			if err != nil {
-				return err
-			}
-		}
-	}
+	slog.Info("Render Thumbnail successful", "cert_id", certificate.ID, "thumbnail_path", thumbnailPath, "url", thumbnailURL)
 	return nil
+}
+
+// RenderCertificateThumbnailAsync renders the certificate thumbnail in the background
+// This function does not block the calling goroutine and logs any errors that occur
+func RenderCertificateThumbnailAsync(certificate *model.Certificate) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("Panic occurred during background thumbnail rendering", "cert_id", certificate.ID, "panic", r)
+			}
+		}()
+
+		if err := RenderCertificateThumbnail(certificate); err != nil {
+			slog.Error("Background thumbnail rendering failed", "error", err, "cert_id", certificate.ID)
+		}
+	}()
+
+	slog.Info("Background thumbnail rendering started", "cert_id", certificate.ID)
 }
