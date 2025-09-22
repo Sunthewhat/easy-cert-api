@@ -14,7 +14,7 @@ import (
 
 func InitFiber() {
 	cfg := fiber.Config{
-		AppName:       "securedocs api",
+		AppName:       "easycert api",
 		ErrorHandler:  handler.HandleError,
 		Prefork:       false,
 		StrictRouting: true,

@@ -472,6 +472,11 @@ func (r *EmbeddedRenderer) RenderThumbnail(ctx context.Context, certificate any)
 }
 
 func (r *EmbeddedRenderer) ProcessThumbnail(ctx context.Context, certificate any, certificateID string) (string, error) {
+	bucketName := *common.Config.BucketCertificate
+
+	// Delete all existing thumbnails for this certificate before generating new one
+	r.deleteOldThumbnails(bucketName, certificateID)
+
 	// Render thumbnail
 	thumbnailResult, err := r.RenderThumbnail(ctx, certificate)
 	if err != nil {
@@ -491,9 +496,6 @@ func (r *EmbeddedRenderer) ProcessThumbnail(ctx context.Context, certificate any
 	// Generate filename with certificate ID folder (using JPEG for smaller size)
 	timestamp := time.Now().Unix()
 	filename := fmt.Sprintf("%s/thumbnail_%d_%s.jpg", certificateID, timestamp, strings.ReplaceAll(uuid.New().String(), "-", ""))
-
-	// Upload to MinIO
-	bucketName := *common.Config.BucketCertificate
 
 	// Ensure bucket exists and has public read policy
 	if err := r.ensureBucketPublic(bucketName); err != nil {
@@ -520,6 +522,36 @@ func (r *EmbeddedRenderer) ProcessThumbnail(ctx context.Context, certificate any
 	slog.Info("Thumbnail uploaded to MinIO", "filename", filename, "directURL", directURL)
 
 	return filename, nil
+}
+
+// deleteOldThumbnails removes all existing thumbnail files for a certificate
+func (r *EmbeddedRenderer) deleteOldThumbnails(bucketName, certificateID string) {
+	prefix := fmt.Sprintf("%s/thumbnail_", certificateID)
+
+	objectCh := r.minIO.ListObjects(context.Background(), bucketName, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	})
+
+	deletedCount := 0
+	for object := range objectCh {
+		if object.Err != nil {
+			slog.Warn("Error listing thumbnail objects", "error", object.Err, "cert_id", certificateID)
+			continue
+		}
+
+		err := r.minIO.RemoveObject(context.Background(), bucketName, object.Key, minio.RemoveObjectOptions{})
+		if err != nil {
+			slog.Warn("Failed to delete old thumbnail", "error", err, "object", object.Key, "cert_id", certificateID)
+		} else {
+			deletedCount++
+			slog.Info("Deleted old thumbnail", "object", object.Key, "cert_id", certificateID)
+		}
+	}
+
+	if deletedCount > 0 {
+		slog.Info("Cleaned up old thumbnails", "count", deletedCount, "cert_id", certificateID)
+	}
 }
 
 // ensureBucketPublic sets the bucket policy to allow public read access

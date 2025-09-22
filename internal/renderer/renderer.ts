@@ -61,7 +61,9 @@ function replacePlaceholders(
 		const design = JSON.parse(designStr);
 
 		if (design.objects && Array.isArray(design.objects)) {
-			console.error(`DEBUG: Processing ${design.objects.length} objects, QR code available: ${!!qrCode}`);
+			console.error(
+				`DEBUG: Processing ${design.objects.length} objects, QR code available: ${!!qrCode}`
+			);
 			design.objects = design.objects.map((obj: PlaceholderObject) => {
 				// Log all objects with IDs for debugging
 				if (obj.id) {
@@ -127,7 +129,9 @@ function replacePlaceholders(
 
 				// Replace QR anchor with QR code if provided - check for qr-anchor anywhere in ID
 				if (obj.id && obj.id.includes('qr-anchor') && qrCode) {
-					console.error(`DEBUG: Found QR anchor ${obj.id}, replacing with QR code (length: ${qrCode.length})`);
+					console.error(
+						`DEBUG: Found QR anchor ${obj.id}, replacing with QR code (length: ${qrCode.length})`
+					);
 					return {
 						...obj,
 						type: 'Image',
@@ -224,7 +228,12 @@ async function loadCanvasWithImageFallback(designStr: string): Promise<fabric.Ca
 	// Add font fallbacks for production environment
 	if (design.objects && Array.isArray(design.objects)) {
 		design.objects = design.objects.map((obj: any) => {
-			if (obj.type === 'Textbox' || obj.type === 'textbox' || obj.type === 'Text' || obj.type === 'text') {
+			if (
+				obj.type === 'Textbox' ||
+				obj.type === 'textbox' ||
+				obj.type === 'Text' ||
+				obj.type === 'text'
+			) {
 				// Ensure font fallbacks for production
 				if (obj.fontFamily && !obj.fontFamily.includes(',')) {
 					obj.fontFamily = `${obj.fontFamily}, Arial, sans-serif`;
@@ -366,8 +375,8 @@ async function generateCertificateThumbnail(
 		});
 
 		// Calculate thumbnail dimensions maintaining aspect ratio
-		const maxThumbnailWidth = 200;
-		const maxThumbnailHeight = 150;
+		const maxThumbnailWidth = 600;
+		const maxThumbnailHeight = 600;
 
 		const aspectRatio = originalWidth / originalHeight;
 		let thumbnailWidth = maxThumbnailWidth;
@@ -416,13 +425,21 @@ async function processBatch<T, R>(
 
 	for (let i = 0; i < items.length; i += batchSize) {
 		const batch = items.slice(i, i + batchSize);
-		console.error(`DEBUG: Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(items.length / batchSize)} (${batch.length} items)`);
+		console.error(
+			`DEBUG: Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(
+				items.length / batchSize
+			)} (${batch.length} items)`
+		);
 
 		const batchPromises = batch.map(processor);
 		const batchResults = await Promise.all(batchPromises);
 		results.push(...batchResults);
 
-		console.error(`DEBUG: Completed batch ${Math.floor(i / batchSize) + 1}, ${batchResults.length} certificates generated`);
+		console.error(
+			`DEBUG: Completed batch ${Math.floor(i / batchSize) + 1}, ${
+				batchResults.length
+			} certificates generated`
+		);
 	}
 
 	return results;
@@ -436,13 +453,20 @@ async function processRenderRequest(request: RenderRequest): Promise<RenderResul
 	// Determine batch size based on participant count
 	// For small batches: process all in parallel
 	// For large batches: use smaller batches to prevent memory issues
-	const batchSize = participantCount <= 10 ? participantCount : Math.min(10, Math.max(5, Math.ceil(participantCount / 4)));
+	const batchSize =
+		participantCount <= 10
+			? participantCount
+			: Math.min(10, Math.max(5, Math.ceil(participantCount / 4)));
 
 	console.error(`DEBUG: Using batch size: ${batchSize} for ${participantCount} participants`);
 
 	const processor = async (participant: ParticipantData): Promise<RenderResult> => {
 		const qrCode = request.qrCodes?.[participant.id];
-		console.error(`DEBUG: Processing participant ${participant.id}, QR code available: ${!!qrCode}, QR length: ${qrCode?.length || 0}`);
+		console.error(
+			`DEBUG: Processing participant ${
+				participant.id
+			}, QR code available: ${!!qrCode}, QR length: ${qrCode?.length || 0}`
+		);
 		return generateCertificateImage(request.certificate, participant, qrCode);
 	};
 
