@@ -390,16 +390,48 @@ async function generateCertificateThumbnail(
 	}
 }
 
-// Main processing function
-async function processRenderRequest(request: RenderRequest): Promise<RenderResult[]> {
-	const results: RenderResult[] = [];
+// Helper function to process items in batches
+async function processBatch<T, R>(
+	items: T[],
+	batchSize: number,
+	processor: (item: T) => Promise<R>
+): Promise<R[]> {
+	const results: R[] = [];
 
-	for (const participant of request.participants) {
+	for (let i = 0; i < items.length; i += batchSize) {
+		const batch = items.slice(i, i + batchSize);
+		console.error(`DEBUG: Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(items.length / batchSize)} (${batch.length} items)`);
+
+		const batchPromises = batch.map(processor);
+		const batchResults = await Promise.all(batchPromises);
+		results.push(...batchResults);
+
+		console.error(`DEBUG: Completed batch ${Math.floor(i / batchSize) + 1}, ${batchResults.length} certificates generated`);
+	}
+
+	return results;
+}
+
+// Main processing function with smart parallelization
+async function processRenderRequest(request: RenderRequest): Promise<RenderResult[]> {
+	const participantCount = request.participants.length;
+	console.error(`DEBUG: Starting processing of ${participantCount} participants`);
+
+	// Determine batch size based on participant count
+	// For small batches: process all in parallel
+	// For large batches: use smaller batches to prevent memory issues
+	const batchSize = participantCount <= 10 ? participantCount : Math.min(10, Math.max(5, Math.ceil(participantCount / 4)));
+
+	console.error(`DEBUG: Using batch size: ${batchSize} for ${participantCount} participants`);
+
+	const processor = async (participant: ParticipantData): Promise<RenderResult> => {
 		const qrCode = request.qrCodes?.[participant.id];
 		console.error(`DEBUG: Processing participant ${participant.id}, QR code available: ${!!qrCode}, QR length: ${qrCode?.length || 0}`);
-		const result = await generateCertificateImage(request.certificate, participant, qrCode);
-		results.push(result);
-	}
+		return generateCertificateImage(request.certificate, participant, qrCode);
+	};
+
+	const results = await processBatch(request.participants, batchSize, processor);
+	console.error(`DEBUG: Completed all processing, ${results.length} total results`);
 
 	return results;
 }

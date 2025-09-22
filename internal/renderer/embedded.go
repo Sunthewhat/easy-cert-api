@@ -14,7 +14,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -112,6 +114,20 @@ func getMapKeys(m map[string]any) []string {
 	return keys
 }
 
+// QRResult represents the result of QR code generation
+type QRResult struct {
+	ParticipantID string
+	QRCode        string
+	Error         error
+}
+
+// QRJob represents a QR code generation job
+type QRJob struct {
+	ParticipantID string
+	VerifyURL     string
+	Index         int
+}
+
 func (r *EmbeddedRenderer) Close() {
 	if r.tempDir != "" {
 		os.RemoveAll(r.tempDir)
@@ -119,64 +135,155 @@ func (r *EmbeddedRenderer) Close() {
 	}
 }
 
-func (r *EmbeddedRenderer) GenerateQRCodes(participants []any, certificateID string) map[string]string {
-	qrCodes := make(map[string]string)
+// extractParticipantID extracts participant ID from various data types
+func (r *EmbeddedRenderer) extractParticipantID(p any, index int) (string, bool) {
+	slog.Info("Processing participant for QR code", "index", index, "participant_type", fmt.Sprintf("%T", p))
 
-	for i, p := range participants {
-		slog.Info("Processing participant for QR code", "index", i, "participant_type", fmt.Sprintf("%T", p), "participant_data", p)
+	var participantID string
 
-		var participantID string
-
-		// Try to extract participant ID using reflection for different types
-		participantValue := reflect.ValueOf(p)
-		if participantValue.Kind() == reflect.Ptr {
-			participantValue = participantValue.Elem()
-		}
-
-		if participantValue.Kind() == reflect.Struct {
-			// Handle struct (likely CombinedParticipant)
-			idField := participantValue.FieldByName("ID")
-			if idField.IsValid() && idField.Kind() == reflect.String {
-				participantID = idField.String()
-				slog.Info("Extracted participant ID from struct", "participant_id", participantID)
-			} else {
-				slog.Warn("Failed to extract ID from struct", "index", i, "struct_type", participantValue.Type())
-				continue
-			}
-		} else if participantMap, ok := p.(map[string]any); ok {
-			// Handle map[string]any
-			if id, exists := participantMap["id"].(string); exists {
-				participantID = id
-				slog.Info("Extracted participant ID from map", "participant_id", participantID)
-			} else {
-				slog.Warn("Failed to extract participant ID from map", "index", i, "participant_keys", getMapKeys(participantMap), "participant", participantMap)
-				continue
-			}
-		} else {
-			slog.Warn("Participant is neither struct nor map", "index", i, "type", fmt.Sprintf("%T", p), "data", p)
-			continue
-		}
-
-		if participantID == "" {
-			slog.Warn("Participant ID is empty", "index", i)
-			continue
-		}
-
-		// Generate verification URL (modify as needed)
-		verifyURL := fmt.Sprintf("%s/validate/result/%s", *common.Config.VerifyHost, participantID)
-		slog.Info("Generating QR code", "participant_id", participantID, "verify_url", verifyURL)
-
-		// Generate QR code
-		qrBytes, err := qrcode.Encode(verifyURL, qrcode.Medium, 100)
-		if err != nil {
-			slog.Warn("Failed to generate QR code", "participant_id", participantID, "error", err)
-			continue
-		}
-
-		// Convert to base64
-		qrBase64 := base64.StdEncoding.EncodeToString(qrBytes)
-		qrCodes[participantID] = qrBase64
+	// Try to extract participant ID using reflection for different types
+	participantValue := reflect.ValueOf(p)
+	if participantValue.Kind() == reflect.Ptr {
+		participantValue = participantValue.Elem()
 	}
+
+	if participantValue.Kind() == reflect.Struct {
+		// Handle struct (likely CombinedParticipant)
+		idField := participantValue.FieldByName("ID")
+		if idField.IsValid() && idField.Kind() == reflect.String {
+			participantID = idField.String()
+			slog.Info("Extracted participant ID from struct", "participant_id", participantID)
+		} else {
+			slog.Warn("Failed to extract ID from struct", "index", index, "struct_type", participantValue.Type())
+			return "", false
+		}
+	} else if participantMap, ok := p.(map[string]any); ok {
+		// Handle map[string]any
+		if id, exists := participantMap["id"].(string); exists {
+			participantID = id
+			slog.Info("Extracted participant ID from map", "participant_id", participantID)
+		} else {
+			slog.Warn("Failed to extract participant ID from map", "index", index, "participant_keys", getMapKeys(participantMap))
+			return "", false
+		}
+	} else {
+		slog.Warn("Participant is neither struct nor map", "index", index, "type", fmt.Sprintf("%T", p))
+		return "", false
+	}
+
+	if participantID == "" {
+		slog.Warn("Participant ID is empty", "index", index)
+		return "", false
+	}
+
+	return participantID, true
+}
+
+// generateSingleQR generates a QR code for a single participant
+func (r *EmbeddedRenderer) generateSingleQR(job QRJob) QRResult {
+	// Generate QR code
+	qrBytes, err := qrcode.Encode(job.VerifyURL, qrcode.Medium, 100)
+	if err != nil {
+		return QRResult{
+			ParticipantID: job.ParticipantID,
+			Error:         fmt.Errorf("failed to generate QR code: %w", err),
+		}
+	}
+
+	// Convert to base64
+	qrBase64 := base64.StdEncoding.EncodeToString(qrBytes)
+	return QRResult{
+		ParticipantID: job.ParticipantID,
+		QRCode:        qrBase64,
+	}
+}
+
+// GenerateQRCodes generates QR codes for all participants in parallel
+func (r *EmbeddedRenderer) GenerateQRCodes(participants []any, certificateID string) map[string]string {
+	participantCount := len(participants)
+	slog.Info("Starting parallel QR code generation", "participant_count", participantCount, "certificate_id", certificateID)
+
+	if participantCount == 0 {
+		return make(map[string]string)
+	}
+
+	// Extract participant IDs and create jobs
+	jobs := make([]QRJob, 0, participantCount)
+	for i, p := range participants {
+		participantID, ok := r.extractParticipantID(p, i)
+		if !ok {
+			continue
+		}
+
+		verifyURL := fmt.Sprintf("%s/validate/result/%s", *common.Config.VerifyHost, participantID)
+		jobs = append(jobs, QRJob{
+			ParticipantID: participantID,
+			VerifyURL:     verifyURL,
+			Index:         i,
+		})
+	}
+
+	if len(jobs) == 0 {
+		slog.Warn("No valid participants found for QR code generation")
+		return make(map[string]string)
+	}
+
+	// Determine optimal number of workers (CPU cores or job count, whichever is smaller)
+	numWorkers := min(runtime.NumCPU(), len(jobs))
+
+	slog.Info("Starting QR code generation workers", "workers", numWorkers, "jobs", len(jobs))
+
+	// Create channels
+	jobChan := make(chan QRJob, len(jobs))
+	resultChan := make(chan QRResult, len(jobs))
+
+	// Start workers
+	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for job := range jobChan {
+				slog.Info("Generating QR code", "worker", workerID, "participant_id", job.ParticipantID, "verify_url", job.VerifyURL)
+				result := r.generateSingleQR(job)
+				resultChan <- result
+			}
+		}(i)
+	}
+
+	// Send jobs to workers
+	for _, job := range jobs {
+		jobChan <- job
+	}
+	close(jobChan)
+
+	// Wait for all workers to complete
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// Collect results
+	qrCodes := make(map[string]string)
+	successCount := 0
+	errorCount := 0
+
+	for result := range resultChan {
+		if result.Error != nil {
+			slog.Warn("Failed to generate QR code", "participant_id", result.ParticipantID, "error", result.Error)
+			errorCount++
+		} else {
+			qrCodes[result.ParticipantID] = result.QRCode
+			successCount++
+		}
+	}
+
+	slog.Info("Completed parallel QR code generation",
+		"certificate_id", certificateID,
+		"total_jobs", len(jobs),
+		"successful", successCount,
+		"errors", errorCount,
+		"final_qr_count", len(qrCodes))
 
 	return qrCodes
 }
