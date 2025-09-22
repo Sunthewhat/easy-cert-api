@@ -34,7 +34,8 @@ RUN apk --no-cache add \
     make \
     g++ \
     curl \
-    unzip
+    unzip \
+    bash
 
 # Install Bun
 RUN curl -fsSL https://bun.sh/install | bash

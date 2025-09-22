@@ -239,7 +239,7 @@ func (r *EmbeddedRenderer) GenerateQRCodes(participants []any, certificateID str
 
 	// Start workers
 	var wg sync.WaitGroup
-	for i := 0; i < numWorkers; i++ {
+	for i := range numWorkers {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
