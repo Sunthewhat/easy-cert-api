@@ -3,3 +3,4 @@ config.yml
 .claude
 node_modules
 .gen*
+signing*.pem

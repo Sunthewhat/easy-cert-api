@@ -1,8 +1,10 @@
 package participant_controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
@@ -11,6 +13,58 @@ import (
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
+
+// extractAnchorNames extracts anchor names from certificate design JSON
+func extractAnchorNames(designJSON string) ([]string, error) {
+	var design map[string]any
+	if err := json.Unmarshal([]byte(designJSON), &design); err != nil {
+		return nil, fmt.Errorf("failed to parse certificate design: %w", err)
+	}
+
+	objects, ok := design["objects"].([]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid design format - objects array not found")
+	}
+
+	var anchorNames []string
+	for _, obj := range objects {
+		objMap, ok := obj.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		id, exists := objMap["id"].(string)
+		if exists && strings.HasPrefix(id, "PLACEHOLDER-") {
+			anchorName := strings.TrimPrefix(id, "PLACEHOLDER-")
+			anchorNames = append(anchorNames, anchorName)
+		}
+	}
+
+	return anchorNames, nil
+}
+
+// validateParticipantFields validates that each participant has all required anchor fields
+func validateParticipantFields(participants []map[string]any, requiredFields []string) error {
+	for i, participant := range participants {
+		for _, field := range requiredFields {
+			value, exists := participant[field]
+			if !exists {
+				return fmt.Errorf("participant %d is missing required field '%s'", i+1, field)
+			}
+
+			// Check if the value is not empty (nil, empty string, etc.)
+			if value == nil {
+				return fmt.Errorf("participant %d has empty value for required field '%s'", i+1, field)
+			}
+
+			// If it's a string, check it's not empty
+			if strValue, isString := value.(string); isString && strings.TrimSpace(strValue) == "" {
+				return fmt.Errorf("participant %d has empty value for required field '%s'", i+1, field)
+			}
+		}
+	}
+	return nil
+}
 
 func Add(c *fiber.Ctx) error {
 	certId := c.Params("certId")
@@ -38,11 +92,24 @@ func Add(c *fiber.Ctx) error {
 		return response.SendError(c, "Failed to parse body")
 	}
 
-	// Validate request
+	// Validate request structure
 	if err := util.ValidateStruct(body); err != nil {
 		errors := util.GetValidationErrors(err)
 		slog.Warn("Participant Add validation failed", "error", errors[0], "cert_id", certId)
 		return response.SendFailed(c, errors[0])
+	}
+
+	// Extract anchor names from certificate design
+	anchorNames, err := extractAnchorNames(cert.Design)
+	if err != nil {
+		slog.Error("Participant Add anchor extraction failed", "error", err, "cert_id", certId)
+		return response.SendInternalError(c, err)
+	}
+
+	// Validate that participants have all required anchor fields
+	if err := validateParticipantFields(body.Participants, anchorNames); err != nil {
+		slog.Warn("Participant Add anchor validation failed", "error", err, "cert_id", certId, "required_anchors", anchorNames)
+		return response.SendFailed(c, err.Error())
 	}
 
 	// Check if collection already exists and has documents
