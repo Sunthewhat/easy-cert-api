@@ -346,7 +346,8 @@ async function generateCertificateThumbnail(
 		const canvas = new fabric.Canvas(null, {
 			width: originalWidth,
 			height: originalHeight,
-			backgroundColor: design.background || '#ffffff',
+			// backgroundColor: design.background || '#ffffff',
+			backgroundColor: '#ffffff',
 			renderOnAddRemove: false, // Prevent automatic rendering for better performance
 			enableRetinaScaling: true, // Enable retina/high-DPI scaling
 		});
