@@ -394,11 +394,11 @@ async function generateCertificateThumbnail(
 			thumbnailHeight / originalHeight
 		);
 
-		// Export with proper scaling and compression
+		// Export with proper scaling - use PNG to avoid black background issues
 		const imageBase64 = canvas
 			.toDataURL({
-				format: 'jpeg', // Use JPEG for smaller file size
-				quality: 0.7, // Compress to 70% quality
+				format: 'png', // Use PNG to preserve transparency and avoid black backgrounds
+				quality: 1.0, // Maximum quality for PNG
 				multiplier: scaleFactor, // Scale down to thumbnail size
 			})
 			.split(',')[1];

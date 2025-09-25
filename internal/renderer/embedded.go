@@ -504,9 +504,9 @@ func (r *EmbeddedRenderer) ProcessThumbnail(ctx context.Context, certificate any
 		return "", fmt.Errorf("failed to decode base64 thumbnail: %w", err)
 	}
 
-	// Generate filename with certificate ID folder (using JPEG for smaller size)
+	// Generate filename with certificate ID folder (using PNG to avoid black background)
 	timestamp := time.Now().Unix()
-	filename := fmt.Sprintf("%s/thumbnail_%d_%s.jpg", certificateID, timestamp, strings.ReplaceAll(uuid.New().String(), "-", ""))
+	filename := fmt.Sprintf("%s/thumbnail_%d_%s.png", certificateID, timestamp, strings.ReplaceAll(uuid.New().String(), "-", ""))
 
 	// Ensure bucket exists and has public read policy
 	if err := r.ensureBucketPublic(bucketName); err != nil {
@@ -520,7 +520,7 @@ func (r *EmbeddedRenderer) ProcessThumbnail(ctx context.Context, certificate any
 		bytes.NewReader(imageBytes),
 		int64(len(imageBytes)),
 		minio.PutObjectOptions{
-			ContentType: "image/jpeg",
+			ContentType: "image/png",
 		},
 	)
 
