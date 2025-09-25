@@ -3,6 +3,7 @@ module github.com/sunthewhat/easy-cert-api
 go 1.23.4
 
 require (
+	github.com/digitorus/pdf v0.1.2
 	github.com/digitorus/pdfsign v0.0.0-20250819064552-5f74f69dda1d
 	github.com/go-playground/validator/v10 v10.27.0
 	github.com/gofiber/fiber/v2 v2.52.6
@@ -26,7 +27,6 @@ require (
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
-	github.com/digitorus/pdf v0.1.2 // indirect
 	github.com/digitorus/pkcs7 v0.0.0-20230818184609-3a137a874352 // indirect
 	github.com/digitorus/timestamp v0.0.0-20231217203849-220c5c2851b7 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
