@@ -57,6 +57,9 @@ COPY --from=builder /app/main .
 # Copy config file if needed
 COPY --from=builder /app/config.yml ./config.yml
 
+# Copy certificate and key files for PDF signing
+COPY --from=builder /app/certs ./certs
+
 # Copy internal renderer assets for embedded renderer
 COPY --from=builder /app/internal/renderer/package.json ./internal/renderer/package.json
 COPY --from=builder /app/internal/renderer/renderer.ts ./internal/renderer/renderer.ts

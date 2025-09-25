@@ -36,3 +36,9 @@ mail_host: smtp.com
 mail_user: mail@com
 
 mail_pass: securepass
+
+signing_enabled: true
+
+signing_cert_path: certs/signing-cert.pem
+
+signing_key_path: certs/signing-key.pem
