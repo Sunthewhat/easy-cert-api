@@ -2,6 +2,7 @@ package participantmodel
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -9,10 +10,41 @@ import (
 	"strings"
 	"time"
 
+	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+// extractAnchorNames extracts anchor names from certificate design JSON
+func extractAnchorNames(designJSON string) ([]string, error) {
+	var design map[string]any
+	if err := json.Unmarshal([]byte(designJSON), &design); err != nil {
+		return nil, fmt.Errorf("failed to parse certificate design: %w", err)
+	}
+
+	objects, ok := design["objects"].([]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid design format - objects array not found")
+	}
+
+	var anchorNames []string
+	for _, obj := range objects {
+		objMap, ok := obj.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		id, exists := objMap["id"].(string)
+		if exists && strings.HasPrefix(id, "PLACEHOLDER-") {
+			anchorName := strings.TrimPrefix(id, "PLACEHOLDER-")
+			anchorNames = append(anchorNames, anchorName)
+		}
+	}
+
+	sort.Strings(anchorNames) // Sort for consistent ordering
+	return anchorNames, nil
+}
 
 // GetParticipantCollectionCount returns the count of participants in the MongoDB collection
 func GetParticipantCollectionCount(certId string) (int64, error) {
@@ -148,60 +180,72 @@ func GetExistingParticipantFields(certId string) ([]string, error) {
 	return fields, nil
 }
 
-// ValidateFieldConsistency checks if new participant fields match existing ones
+// ValidateFieldConsistency checks if new participant fields match certificate design anchors
 func ValidateFieldConsistency(certId string, newParticipants []map[string]any) error {
-	existingFields, err := GetExistingParticipantFields(certId)
+	// Get certificate design to extract required anchor fields
+	cert, err := certificatemodel.GetById(certId)
 	if err != nil {
-		return fmt.Errorf("failed to get existing fields: %w", err)
+		return fmt.Errorf("failed to get certificate: %w", err)
+	}
+	if cert == nil {
+		return fmt.Errorf("certificate not found")
 	}
 
-	// If no existing fields (empty collection), allow any structure
-	if len(existingFields) == 0 {
-		slog.Info("ParticipantModel ValidateFieldConsistency: empty collection, allowing any fields", "cert_id", certId)
+	// Extract anchor names from certificate design
+	requiredFields, err := extractAnchorNames(cert.Design)
+	if err != nil {
+		return fmt.Errorf("failed to extract anchor names from certificate design: %w", err)
+	}
+
+	// If no anchors in design, allow any structure (for backward compatibility)
+	if len(requiredFields) == 0 {
+		slog.Info("ParticipantModel ValidateFieldConsistency: no anchors in certificate design, allowing any fields", "cert_id", certId)
 		return nil
 	}
 
-	// Check each new participant
+	// Check each new participant against required anchor fields
 	for i, participant := range newParticipants {
-		var newFields []string
-		for key := range participant {
-			newFields = append(newFields, key)
+		// Check if all required anchor fields are present
+		var missingFields []string
+		for _, requiredField := range requiredFields {
+			value, exists := participant[requiredField]
+			if !exists {
+				missingFields = append(missingFields, requiredField)
+			} else if value == nil {
+				missingFields = append(missingFields, requiredField+" (empty)")
+			} else if strValue, isString := value.(string); isString && strings.TrimSpace(strValue) == "" {
+				missingFields = append(missingFields, requiredField+" (empty)")
+			}
 		}
-		sort.Strings(newFields)
 
-		// Compare field sets
-		if !areFieldsConsistent(existingFields, newFields) {
-			missingFields := findMissingFields(existingFields, newFields)
-			extraFields := findMissingFields(newFields, existingFields)
-
-			var errorMsg strings.Builder
-			errorMsg.WriteString(fmt.Sprintf("participant %d has inconsistent fields", i+1))
-
-			if len(missingFields) > 0 {
-				errorMsg.WriteString(fmt.Sprintf(", missing required fields: %s", strings.Join(missingFields, ", ")))
+		if len(missingFields) > 0 {
+			var participantFields []string
+			for key := range participant {
+				participantFields = append(participantFields, key)
 			}
-			if len(extraFields) > 0 {
-				errorMsg.WriteString(fmt.Sprintf(", unexpected fields: %s", strings.Join(extraFields, ", ")))
-			}
+			sort.Strings(participantFields)
 
-			errorMsg.WriteString(fmt.Sprintf(". Expected fields: %s", strings.Join(existingFields, ", ")))
+			errorMsg := fmt.Sprintf("participant %d is missing required anchor fields: %s. Required: %s, Provided: %s",
+				i+1,
+				strings.Join(missingFields, ", "),
+				strings.Join(requiredFields, ", "),
+				strings.Join(participantFields, ", "))
 
-			slog.Warn("ParticipantModel field validation failed",
+			slog.Warn("ParticipantModel anchor field validation failed",
 				"cert_id", certId,
 				"participant_index", i,
-				"expected_fields", existingFields,
-				"actual_fields", newFields,
-				"missing_fields", missingFields,
-				"extra_fields", extraFields)
+				"required_anchor_fields", requiredFields,
+				"provided_fields", participantFields,
+				"missing_fields", missingFields)
 
-			return errors.New(errorMsg.String())
+			return errors.New(errorMsg)
 		}
 	}
 
 	slog.Info("ParticipantModel ValidateFieldConsistency passed",
 		"cert_id", certId,
 		"participant_count", len(newParticipants),
-		"expected_fields", existingFields)
+		"required_anchor_fields", requiredFields)
 	return nil
 }
 
