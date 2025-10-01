@@ -35,6 +35,13 @@ func Render(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Certificate not found")
 	}
 
+	if !cert.IsDistributed {
+		err := certificatemodel.MarkAsDistributed(certId)
+		if err != nil {
+			return response.SendInternalError(c, err)
+		}
+	}
+
 	userId, success := middleware.GetUserFromContext(c)
 
 	if !success {

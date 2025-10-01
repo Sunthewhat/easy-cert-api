@@ -143,3 +143,12 @@ func EditArchiveUrl(certificateId string, archiveUrl string) error {
 	}
 	return nil
 }
+
+func MarkAsDistributed(certificateId string) error {
+	_, queryErr := common.Gorm.Certificate.Where(common.Gorm.Certificate.ID.Eq(certificateId)).Update(common.Gorm.Certificate.IsDistributed, true)
+	if queryErr != nil {
+		slog.Error("Mark certificate as distributed Error", "error", queryErr)
+		return queryErr
+	}
+	return nil
+}
