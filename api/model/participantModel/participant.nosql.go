@@ -315,53 +315,88 @@ func DeleteCollectionByCertIdFromMongo(certId string) error {
 	return nil
 }
 
-// validateEditDataStructure validates that new data has the same structure as existing data
+// validateEditDataStructure validates that new data matches the certificate design anchors
 func validateEditDataStructure(certId string, newData map[string]any) error {
-	existingFields, err := GetExistingParticipantFields(certId)
+	// Get certificate design to validate against current anchors
+	cert, err := certificatemodel.GetById(certId)
 	if err != nil {
-		return fmt.Errorf("failed to get existing fields: %w", err)
+		return fmt.Errorf("failed to get certificate: %w", err)
+	}
+	if cert == nil {
+		return fmt.Errorf("certificate not found")
 	}
 
-	// If no existing fields (empty collection), cannot edit non-existent data
-	if len(existingFields) == 0 {
-		return errors.New("cannot edit participant data: no existing participants found for this certificate")
+	// Extract required anchor fields from certificate design
+	requiredAnchors, err := extractAnchorNames(cert.Design)
+	if err != nil {
+		return fmt.Errorf("failed to extract anchor names from certificate design: %w", err)
 	}
 
-	// Get fields from new data (excluding auto-added fields)
+	// Protected fields that should not be validated
+	protectedFields := map[string]bool{
+		"_id":            true,
+		"certificate_id": true,
+		"email":          true,
+	}
+
+	// Get fields from new data (excluding protected fields)
 	var newFields []string
 	for key := range newData {
-		newFields = append(newFields, key)
+		if !protectedFields[key] {
+			newFields = append(newFields, key)
+		}
 	}
 	sort.Strings(newFields)
 
-	// Compare field sets using existing validation logic
-	if !areFieldsConsistent(existingFields, newFields) {
-		missingFields := findMissingFields(existingFields, newFields)
-		extraFields := findMissingFields(newFields, existingFields)
+	// Check if all required anchors are present in the new data
+	missingAnchors := []string{}
+	for _, anchor := range requiredAnchors {
+		if _, exists := newData[anchor]; !exists {
+			missingAnchors = append(missingAnchors, anchor)
+		}
+	}
 
+	// Check if there are any unexpected fields (not in anchors and not protected)
+	validAnchors := make(map[string]bool)
+	for _, anchor := range requiredAnchors {
+		validAnchors[anchor] = true
+	}
+
+	invalidFields := []string{}
+	for key := range newData {
+		if !protectedFields[key] && !validAnchors[key] {
+			invalidFields = append(invalidFields, key)
+		}
+	}
+
+	// Build error message if validation failed
+	if len(missingAnchors) > 0 || len(invalidFields) > 0 {
 		var errorMsg strings.Builder
-		errorMsg.WriteString("data structure mismatch")
+		errorMsg.WriteString("data structure validation failed")
 
-		if len(missingFields) > 0 {
-			errorMsg.WriteString(fmt.Sprintf(", missing required fields: %s", strings.Join(missingFields, ", ")))
+		if len(missingAnchors) > 0 {
+			errorMsg.WriteString(fmt.Sprintf(", missing required anchor fields: %s", strings.Join(missingAnchors, ", ")))
 		}
-		if len(extraFields) > 0 {
-			errorMsg.WriteString(fmt.Sprintf(", unexpected fields: %s", strings.Join(extraFields, ", ")))
+		if len(invalidFields) > 0 {
+			errorMsg.WriteString(fmt.Sprintf(", invalid fields (not in certificate anchors): %s", strings.Join(invalidFields, ", ")))
 		}
 
-		errorMsg.WriteString(fmt.Sprintf(". Expected fields: %s", strings.Join(existingFields, ", ")))
+		errorMsg.WriteString(fmt.Sprintf(". Required anchors: %s", strings.Join(requiredAnchors, ", ")))
 
 		slog.Warn("ParticipantModel edit validation failed",
 			"cert_id", certId,
-			"expected_fields", existingFields,
-			"actual_fields", newFields,
-			"missing_fields", missingFields,
-			"extra_fields", extraFields)
+			"required_anchors", requiredAnchors,
+			"provided_fields", newFields,
+			"missing_anchors", missingAnchors,
+			"invalid_fields", invalidFields)
 
 		return errors.New(errorMsg.String())
 	}
 
-	slog.Info("ParticipantModel edit validation passed", "cert_id", certId, "fields", newFields)
+	slog.Info("ParticipantModel edit validation passed",
+		"cert_id", certId,
+		"required_anchors", requiredAnchors,
+		"provided_fields", newFields)
 	return nil
 }
 
@@ -426,6 +461,114 @@ func deleteParticipantByIdFromMongo(certId, participantID string) error {
 		"cert_id", certId,
 		"participant_id", participantID,
 		"deleted_count", result.DeletedCount)
+
+	return nil
+}
+
+// CleanupDeletedAnchors removes fields from all participant documents that are no longer anchors in the certificate design
+// Always preserves: _id, certificate_id, and email
+func CleanupDeletedAnchors(certId string, designJSON string) error {
+	// Extract current anchor names from certificate design
+	currentAnchors, err := extractAnchorNames(designJSON)
+	if err != nil {
+		return fmt.Errorf("failed to extract anchor names: %w", err)
+	}
+
+	// Create a set of valid anchor names for quick lookup
+	validAnchors := make(map[string]bool)
+	for _, anchor := range currentAnchors {
+		validAnchors[anchor] = true
+	}
+
+	// Always keep these fields
+	protectedFields := map[string]bool{
+		"_id":            true,
+		"certificate_id": true,
+		"email":          true,
+	}
+
+	collectionName := "participant-" + certId
+	collection := common.Mongo.Collection(collectionName)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Get all participants
+	cursor, err := collection.Find(ctx, bson.M{"certificate_id": certId})
+	if err != nil {
+		slog.Error("ParticipantModel CleanupDeletedAnchors: failed to find participants", "error", err, "cert_id", certId)
+		return fmt.Errorf("failed to find participants: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var participants []map[string]any
+	if err = cursor.All(ctx, &participants); err != nil {
+		slog.Error("ParticipantModel CleanupDeletedAnchors: failed to decode participants", "error", err, "cert_id", certId)
+		return fmt.Errorf("failed to decode participants: %w", err)
+	}
+
+	// Process each participant and find fields to remove
+	updatedCount := 0
+	for _, participant := range participants {
+		participantID, ok := participant["_id"].(string)
+		if !ok {
+			slog.Warn("ParticipantModel CleanupDeletedAnchors: participant missing _id, skipping", "cert_id", certId)
+			continue
+		}
+
+		// Find fields that should be removed (not in anchors and not protected)
+		fieldsToRemove := []string{}
+		for fieldName := range participant {
+			// Skip protected fields
+			if protectedFields[fieldName] {
+				continue
+			}
+
+			// If field is not a valid anchor, mark it for removal
+			if !validAnchors[fieldName] {
+				fieldsToRemove = append(fieldsToRemove, fieldName)
+			}
+		}
+
+		// If there are fields to remove, update the document
+		if len(fieldsToRemove) > 0 {
+			// Create unset operation for fields to remove
+			unsetDoc := bson.M{}
+			for _, field := range fieldsToRemove {
+				unsetDoc[field] = ""
+			}
+
+			// Update the document
+			result, err := collection.UpdateOne(
+				ctx,
+				bson.M{"_id": participantID},
+				bson.M{"$unset": unsetDoc},
+			)
+
+			if err != nil {
+				slog.Error("ParticipantModel CleanupDeletedAnchors: failed to update participant",
+					"error", err,
+					"cert_id", certId,
+					"participant_id", participantID,
+					"fields_to_remove", fieldsToRemove)
+				continue
+			}
+
+			if result.ModifiedCount > 0 {
+				updatedCount++
+				slog.Info("ParticipantModel CleanupDeletedAnchors: cleaned participant",
+					"cert_id", certId,
+					"participant_id", participantID,
+					"removed_fields", fieldsToRemove)
+			}
+		}
+	}
+
+	slog.Info("ParticipantModel CleanupDeletedAnchors completed",
+		"cert_id", certId,
+		"total_participants", len(participants),
+		"updated_participants", updatedCount,
+		"valid_anchors", currentAnchors)
 
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
+	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -47,6 +48,15 @@ func Update(c *fiber.Ctx) error {
 		}
 		slog.Error("Certificate Update controller failed", "error", updateErr, "cert_id", id)
 		return response.SendInternalError(c, updateErr)
+	}
+
+	// If design was updated, clean up deleted anchors from participants
+	if body.Design != "" {
+		cleanupErr := participantmodel.CleanupDeletedAnchors(id, updatedCert.Design)
+		if cleanupErr != nil {
+			slog.Warn("Failed to cleanup deleted anchors from participants", "error", cleanupErr, "cert_id", id)
+			// Don't fail the update operation if cleanup fails, just log it
+		}
 	}
 
 	slog.Info("Certificate Update successful", "cert_id", id, "cert_name", updatedCert.Name)
