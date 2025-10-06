@@ -20,6 +20,8 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		db:          db,
 		Certificate: newCertificate(db, opts...),
 		Participant: newParticipant(db, opts...),
+		Signature:   newSignature(db, opts...),
+		Signer:      newSigner(db, opts...),
 	}
 }
 
@@ -28,6 +30,8 @@ type Query struct {
 
 	Certificate certificate
 	Participant participant
+	Signature   signature
+	Signer      signer
 }
 
 func (q *Query) Available() bool { return q.db != nil }
@@ -37,6 +41,8 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		db:          db,
 		Certificate: q.Certificate.clone(db),
 		Participant: q.Participant.clone(db),
+		Signature:   q.Signature.clone(db),
+		Signer:      q.Signer.clone(db),
 	}
 }
 
@@ -53,18 +59,24 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		db:          db,
 		Certificate: q.Certificate.replaceDB(db),
 		Participant: q.Participant.replaceDB(db),
+		Signature:   q.Signature.replaceDB(db),
+		Signer:      q.Signer.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
 	Certificate *certificateDo
 	Participant *participantDo
+	Signature   *signatureDo
+	Signer      *signerDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
 		Certificate: q.Certificate.WithContext(ctx),
 		Participant: q.Participant.WithContext(ctx),
+		Signature:   q.Signature.WithContext(ctx),
+		Signer:      q.Signer.WithContext(ctx),
 	}
 }
 

@@ -52,9 +52,9 @@ func Init(app *fiber.App) {
 
 	// Handle OPTIONS requests (CORS preflight)
 	api.Options("/health", func(c *fiber.Ctx) error {
-		slog.Debug("Health Check OPTIONS request", 
-			"method", c.Method(), 
-			"path", c.Path(), 
+		slog.Debug("Health Check OPTIONS request",
+			"method", c.Method(),
+			"path", c.Path(),
 			"user_agent", c.Get("User-Agent"))
 		return c.SendStatus(200)
 	})
@@ -70,6 +70,8 @@ func Init(app *fiber.App) {
 	SetupCertificateRoutes(v1)
 	SetupParticipantRoutes(v1)
 	SetupFileRoutes(v1)
+	SetupSignerRoutes(v1)
+	SetupSignatureRoutes(v1)
 
 	// Handle favicon requests to prevent 404s
 	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
