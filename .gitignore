@@ -4,3 +4,4 @@ config.yml
 node_modules
 .gen*
 signing*.pem
+easy-cert-api
