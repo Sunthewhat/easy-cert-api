@@ -23,4 +23,5 @@ type Config struct {
 	SigningEnabled    *bool     `yaml:"signing_enabled"`
 	SigningCertPath   *string   `yaml:"signing_cert_path"`
 	SigningKeyPath    *string   `yaml:"signing_key_path"`
+	EncryptionKey     *string   `yaml:"encryption_key" validate:"required"`
 }
