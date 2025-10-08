@@ -11,12 +11,15 @@ import (
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/common"
+	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/internal/renderer"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
 func Render(c *fiber.Ctx) error {
 	certId := c.Params("certId")
+
+	isRenewAll := c.Query("renew") // "true", "false", ""
 
 	if certId == "" {
 		slog.Warn("Certificate Render attempt with empty certificate ID")
@@ -55,10 +58,82 @@ func Render(c *fiber.Ctx) error {
 	}
 
 	// Get participants data
-	participants, err := participantmodel.GetParticipantsByCertId(certId)
+	allParticipants, err := participantmodel.GetParticipantsByCertId(certId)
 	if err != nil {
 		slog.Error("Certificate Render GetParticipantsByCertId failed", "error", err, "cert_id", certId)
 		return response.SendInternalError(c, err)
+	}
+
+	// Filter participants based on isRenewAll parameter
+	var participants []*participantmodel.CombinedParticipant
+	if isRenewAll == "true" {
+		// Renew all participants
+		participants = allParticipants
+		slog.Info("Certificate Render: Renewing all participants", "cert_id", certId, "count", len(participants))
+	} else {
+		// Only renew participants that haven't been distributed
+		for _, p := range allParticipants {
+			if !p.IsDistributed {
+				participants = append(participants, p)
+			}
+		}
+		slog.Info("Certificate Render: Renewing only non-distributed participants",
+			"cert_id", certId,
+			"total_count", len(allParticipants),
+			"to_renew_count", len(participants))
+	}
+
+	// Delete old zip archive file
+	if cert.ArchiveURL != "" {
+		slog.Info("Certificate Render: Deleting old zip archive",
+			"cert_id", certId,
+			"archive_url", cert.ArchiveURL)
+
+		ctx := context.Background()
+		err := util.DeleteFileByURL(ctx, *common.Config.BucketCertificate, cert.ArchiveURL)
+		if err != nil {
+			slog.Warn("Certificate Render: Failed to delete old zip archive",
+				"error", err,
+				"cert_id", certId,
+				"archive_url", cert.ArchiveURL)
+		} else {
+			slog.Info("Certificate Render: Successfully deleted old zip archive",
+				"cert_id", certId)
+		}
+	}
+
+	// Delete old certificate files for participants that will be regenerated
+	if len(participants) > 0 {
+		slog.Info("Certificate Render: Deleting old certificate files",
+			"cert_id", certId,
+			"participant_count", len(participants))
+
+		ctx := context.Background()
+		deletedCount := 0
+		failedCount := 0
+
+		for _, p := range participants {
+			if p.CertificateURL != "" {
+				err := util.DeleteFileByURL(ctx, *common.Config.BucketCertificate, p.CertificateURL)
+				if err != nil {
+					slog.Warn("Certificate Render: Failed to delete old certificate file",
+						"error", err,
+						"participant_id", p.ID,
+						"certificate_url", p.CertificateURL)
+					failedCount++
+				} else {
+					slog.Debug("Certificate Render: Deleted old certificate file",
+						"participant_id", p.ID,
+						"certificate_url", p.CertificateURL)
+					deletedCount++
+				}
+			}
+		}
+
+		slog.Info("Certificate Render: Old certificate cleanup completed",
+			"cert_id", certId,
+			"deleted_count", deletedCount,
+			"failed_count", failedCount)
 	}
 
 	slog.Info("Certificate Render starting embedded renderer",

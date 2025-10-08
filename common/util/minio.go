@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"strings"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -127,4 +128,41 @@ func ListFilesByPrefix(ctx context.Context, bucketName string, prefix string, li
 	}
 
 	return fileURLs, nil
+}
+
+// ExtractObjectNameFromURL extracts the object name from a MinIO URL
+// Example: https://endpoint/bucket/path/to/file.pdf -> path/to/file.pdf
+func ExtractObjectNameFromURL(url string, bucketName string) (string, error) {
+	if url == "" {
+		return "", fmt.Errorf("URL is empty")
+	}
+
+	// Find the bucket name in the URL and extract everything after it
+	bucketPrefix := fmt.Sprintf("/%s/", bucketName)
+	idx := strings.Index(url, bucketPrefix)
+	if idx == -1 {
+		return "", fmt.Errorf("bucket name not found in URL")
+	}
+
+	objectName := url[idx+len(bucketPrefix):]
+	if objectName == "" {
+		return "", fmt.Errorf("object name is empty")
+	}
+
+	return objectName, nil
+}
+
+// DeleteFileByURL deletes a file from MinIO given its full URL
+func DeleteFileByURL(ctx context.Context, bucketName string, fileURL string) error {
+	if fileURL == "" {
+		// If URL is empty, nothing to delete
+		return nil
+	}
+
+	objectName, err := ExtractObjectNameFromURL(fileURL, bucketName)
+	if err != nil {
+		return fmt.Errorf("failed to extract object name from URL: %w", err)
+	}
+
+	return DeleteFile(ctx, bucketName, objectName)
 }
