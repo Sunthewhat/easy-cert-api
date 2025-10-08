@@ -131,3 +131,62 @@ func validateDownloadedFile(filename string) error {
 	slog.Info("File validation passed", "filename", filename, "size", stat.Size())
 	return nil
 }
+
+// SendSignatureRequestMail sends an email to a signer requesting them to sign a certificate
+func SendSignatureRequestMail(signerEmail, signerName, certificateId, certificateName string) error {
+	signatureURL := fmt.Sprintf("%s/signature/%s", *common.Config.VerifyHost, certificateId)
+
+	mailer := gomail.NewMessage()
+	mailer.SetHeader("From", *common.Config.MailUser)
+	mailer.SetHeader("To", signerEmail)
+	mailer.SetHeader("Subject", fmt.Sprintf("Signature Request for Certificate: %s", certificateName))
+
+	// HTML email body with better formatting
+	htmlBody := fmt.Sprintf(`
+		<!DOCTYPE html>
+		<html>
+		<head>
+			<style>
+				body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+				.container { max-width: 600px; margin: 0 auto; padding: 20px; }
+				.header { background-color: #3b82f6; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+				.content { background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
+				.certificate-name { font-weight: bold; color: #1f2937; font-size: 18px; margin: 15px 0; }
+				.button { display: inline-block; padding: 12px 30px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+				.button:hover { background-color: #2563eb; }
+				.footer { color: #6b7280; font-size: 14px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+			</style>
+		</head>
+		<body>
+			<div class="container">
+				<div class="header">
+					<h2>Signature Request</h2>
+				</div>
+				<div class="content">
+					<p>Dear %s,</p>
+					<p>You have been requested to sign the following certificate:</p>
+					<div class="certificate-name">"%s"</div>
+					<p>Please click the button below to review and sign the certificate:</p>
+					<a href="%s" class="button">Sign Certificate</a>
+					<p>Or copy this link to your browser:</p>
+					<p style="word-break: break-all; color: #3b82f6;">%s</p>
+					<div class="footer">
+						<p>Best regards,<br>Easy Cert Team</p>
+						<p style="font-size: 12px; color: #9ca3af;">If you did not expect this email, please ignore it.</p>
+					</div>
+				</div>
+			</div>
+		</body>
+		</html>
+	`, signerName, certificateName, signatureURL, signatureURL)
+
+	mailer.SetBody("text/html", htmlBody)
+
+	if err := common.Dialer.DialAndSend(mailer); err != nil {
+		slog.Error("Error sending signature request email", "error", err, "recipient", signerEmail, "certificateId", certificateId)
+		return err
+	}
+
+	slog.Info("Signature request email sent successfully", "recipient", signerEmail, "certificateId", certificateId)
+	return nil
+}

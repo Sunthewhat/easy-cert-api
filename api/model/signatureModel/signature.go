@@ -2,9 +2,12 @@ package signaturemodel
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/sunthewhat/easy-cert-api/common"
+	"github.com/sunthewhat/easy-cert-api/common/util"
+	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/shared/model"
 	"gorm.io/gorm"
@@ -116,6 +119,54 @@ func BulkCreateSignatures(certificateId string, signerIds []string, userId strin
 		slog.Info("BulkCreateSignatures: Created signatures", "certificateId", certificateId, "count", len(newSignatures), "skipped", len(signerIds)-len(newSignatures))
 	} else {
 		slog.Info("BulkCreateSignatures: All signatures already exist", "certificateId", certificateId)
+	}
+
+	return nil
+}
+
+// BulkSendSignatureRequests sends signature request emails to multiple signers
+func BulkSendSignatureRequests(certificateId, certificateName string, signerIds []string) error {
+	if len(signerIds) == 0 {
+		return nil
+	}
+
+	var successCount, failedCount int
+	var lastError error
+
+	for _, signerId := range signerIds {
+		// Get signer details
+		signer, err := signermodel.GetById(signerId)
+		if err != nil {
+			slog.Error("BulkSendSignatureRequests: Error getting signer", "error", err, "signerId", signerId, "certificateId", certificateId)
+			failedCount++
+			lastError = err
+			continue
+		}
+
+		if signer == nil {
+			slog.Warn("BulkSendSignatureRequests: Signer not found", "signerId", signerId, "certificateId", certificateId)
+			failedCount++
+			lastError = fmt.Errorf("signer %s not found", signerId)
+			continue
+		}
+
+		// Send signature request email
+		err = util.SendSignatureRequestMail(signer.Email, signer.DisplayName, certificateId, certificateName)
+		if err != nil {
+			slog.Error("BulkSendSignatureRequests: Failed to send email", "error", err, "signerId", signerId, "email", signer.Email, "certificateId", certificateId)
+			failedCount++
+			lastError = err
+			continue
+		}
+
+		successCount++
+	}
+
+	slog.Info("BulkSendSignatureRequests: Completed", "certificateId", certificateId, "total", len(signerIds), "success", successCount, "failed", failedCount)
+
+	// Only return error if all emails failed
+	if failedCount > 0 && successCount == 0 {
+		return fmt.Errorf("failed to send all signature request emails: %w", lastError)
 	}
 
 	return nil

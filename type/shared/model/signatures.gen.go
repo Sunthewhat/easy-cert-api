@@ -19,6 +19,8 @@ type Signature struct {
 	CreatedAt     time.Time `gorm:"column:created_at;not null;default:now()" json:"created_at"`
 	IsSigned      bool      `gorm:"column:is_signed;not null" json:"is_signed"`
 	CreatedBy     string    `gorm:"column:created_by;not null" json:"created_by"`
+	IsRequested   bool      `gorm:"column:is_requested;not null" json:"is_requested"`
+	LastRequest   time.Time `gorm:"column:last_request;not null;default:now()" json:"last_request"`
 }
 
 // TableName Signature's table name

@@ -120,6 +120,13 @@ func Update(c *fiber.Ctx) error {
 				if bulkCreateErr != nil {
 					slog.Warn("Failed to create signatures for certificate", "error", bulkCreateErr, "cert_id", id)
 					// Don't fail the update operation if signature creation fails, just log it
+				} else {
+					// Send signature request emails after successful signature creation
+					emailErr := signaturemodel.BulkSendSignatureRequests(id, updatedCert.Name, signerIds)
+					if emailErr != nil {
+						slog.Warn("Failed to send signature request emails", "error", emailErr, "cert_id", id)
+						// Don't fail the update operation if email sending fails, just log it
+					}
 				}
 			}
 		}

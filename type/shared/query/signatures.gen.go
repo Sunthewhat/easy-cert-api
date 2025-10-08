@@ -34,6 +34,8 @@ func newSignature(db *gorm.DB, opts ...gen.DOOption) signature {
 	_signature.CreatedAt = field.NewTime(tableName, "created_at")
 	_signature.IsSigned = field.NewBool(tableName, "is_signed")
 	_signature.CreatedBy = field.NewString(tableName, "created_by")
+	_signature.IsRequested = field.NewBool(tableName, "is_requested")
+	_signature.LastRequest = field.NewTime(tableName, "last_request")
 
 	_signature.fillFieldMap()
 
@@ -51,6 +53,8 @@ type signature struct {
 	CreatedAt     field.Time
 	IsSigned      field.Bool
 	CreatedBy     field.String
+	IsRequested   field.Bool
+	LastRequest   field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -74,6 +78,8 @@ func (s *signature) updateTableName(table string) *signature {
 	s.CreatedAt = field.NewTime(table, "created_at")
 	s.IsSigned = field.NewBool(table, "is_signed")
 	s.CreatedBy = field.NewString(table, "created_by")
+	s.IsRequested = field.NewBool(table, "is_requested")
+	s.LastRequest = field.NewTime(table, "last_request")
 
 	s.fillFieldMap()
 
@@ -90,7 +96,7 @@ func (s *signature) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (s *signature) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 7)
+	s.fieldMap = make(map[string]field.Expr, 9)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["signer_id"] = s.SignerID
 	s.fieldMap["certificate_id"] = s.CertificateID
@@ -98,6 +104,8 @@ func (s *signature) fillFieldMap() {
 	s.fieldMap["created_at"] = s.CreatedAt
 	s.fieldMap["is_signed"] = s.IsSigned
 	s.fieldMap["created_by"] = s.CreatedBy
+	s.fieldMap["is_requested"] = s.IsRequested
+	s.fieldMap["last_request"] = s.LastRequest
 }
 
 func (s signature) clone(db *gorm.DB) signature {
