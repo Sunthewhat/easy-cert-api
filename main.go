@@ -39,5 +39,8 @@ func main() {
 		slog.Info("MinIO initialized successfully")
 	}
 
+	// Start signature reminder job for daily email reminders
+	util.StartSignatureReminderJob()
+
 	api.InitFiber()
 }

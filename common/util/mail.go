@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
+	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"gopkg.in/gomail.v2"
 )
@@ -188,5 +190,121 @@ func SendSignatureRequestMail(signerEmail, signerName, certificateId, certificat
 	}
 
 	slog.Info("Signature request email sent successfully", "recipient", signerEmail, "certificateId", certificateId)
+	return nil
+}
+
+// SendSignatureReminderMail sends a reminder email to a signer
+func SendSignatureReminderMail(signerEmail, signerName, certificateId, certificateName string) error {
+	signatureURL := fmt.Sprintf("%s/signature/%s", *common.Config.VerifyHost, certificateId)
+
+	mailer := gomail.NewMessage()
+	mailer.SetHeader("From", *common.Config.MailUser)
+	mailer.SetHeader("To", signerEmail)
+	mailer.SetHeader("Subject", fmt.Sprintf("Reminder: Signature Request for Certificate: %s", certificateName))
+
+	// HTML email body with reminder emphasis
+	htmlBody := fmt.Sprintf(`
+		<!DOCTYPE html>
+		<html>
+		<head>
+			<style>
+				body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+				.container { max-width: 600px; margin: 0 auto; padding: 20px; }
+				.header { background-color: #f59e0b; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+				.content { background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
+				.certificate-name { font-weight: bold; color: #1f2937; font-size: 18px; margin: 15px 0; }
+				.reminder-badge { background-color: #fef3c7; color: #92400e; padding: 8px 16px; border-radius: 5px; display: inline-block; margin: 10px 0; font-weight: bold; }
+				.button { display: inline-block; padding: 12px 30px; background-color: #f59e0b; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+				.button:hover { background-color: #d97706; }
+				.footer { color: #6b7280; font-size: 14px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+			</style>
+		</head>
+		<body>
+			<div class="container">
+				<div class="header">
+					<h2>🔔 Signature Reminder</h2>
+				</div>
+				<div class="content">
+					<div class="reminder-badge">⏰ REMINDER</div>
+					<p>Dear %s,</p>
+					<p>This is a friendly reminder that you have a pending signature request for the following certificate:</p>
+					<div class="certificate-name">"%s"</div>
+					<p>Your signature is still needed. Please click the button below to review and sign the certificate:</p>
+					<a href="%s" class="button">Sign Certificate Now</a>
+					<p>Or copy this link to your browser:</p>
+					<p style="word-break: break-all; color: #f59e0b;">%s</p>
+					<div class="footer">
+						<p>Best regards,<br>Easy Cert Team</p>
+						<p style="font-size: 12px; color: #9ca3af;">You will continue to receive reminders until the certificate is signed. If you did not expect this email, please ignore it.</p>
+					</div>
+				</div>
+			</div>
+		</body>
+		</html>
+	`, signerName, certificateName, signatureURL, signatureURL)
+
+	mailer.SetBody("text/html", htmlBody)
+
+	if err := common.Dialer.DialAndSend(mailer); err != nil {
+		slog.Error("Error sending signature reminder email", "error", err, "recipient", signerEmail, "certificateId", certificateId)
+		return err
+	}
+
+	slog.Info("Signature reminder email sent successfully", "recipient", signerEmail, "certificateId", certificateId)
+	return nil
+}
+
+// BulkSendSignatureRequests sends signature request emails to multiple signers
+func BulkSendSignatureRequests(certificateId, certificateName string, signerIds []string) error {
+	if len(signerIds) == 0 {
+		return nil
+	}
+
+	var successCount, failedCount int
+	var lastError error
+
+	for _, signerId := range signerIds {
+		// Get signer details
+		signer, err := signermodel.GetById(signerId)
+		if err != nil {
+			slog.Error("BulkSendSignatureRequests: Error getting signer", "error", err, "signerId", signerId, "certificateId", certificateId)
+			failedCount++
+			lastError = err
+			continue
+		}
+
+		if signer == nil {
+			slog.Warn("BulkSendSignatureRequests: Signer not found", "signerId", signerId, "certificateId", certificateId)
+			failedCount++
+			lastError = fmt.Errorf("signer %s not found", signerId)
+			continue
+		}
+
+		// Send signature request email
+		err = SendSignatureRequestMail(signer.Email, signer.DisplayName, certificateId, certificateName)
+		if err != nil {
+			slog.Error("BulkSendSignatureRequests: Failed to send email", "error", err, "signerId", signerId, "email", signer.Email, "certificateId", certificateId)
+			failedCount++
+			lastError = err
+			continue
+		}
+
+		// Mark signature as requested after successful email send
+		markErr := signaturemodel.MarkAsRequested(certificateId, signerId)
+		if markErr != nil {
+			slog.Warn("BulkSendSignatureRequests: Failed to mark as requested", "error", markErr, "signerId", signerId, "certificateId", certificateId)
+			// Don't fail if marking fails - email was sent successfully
+		}
+
+		successCount++
+	}
+
+	slog.Info("BulkSendSignatureRequests: Completed", "certificateId", certificateId, "total", len(signerIds), "success", successCount, "failed", failedCount)
+
+	// Only return error if all emails failed
+	if failedCount > 0 && successCount == 0 {
+		return fmt.Errorf("failed to send all signature request emails: %w", lastError)
+	}
+
 	return nil
 }

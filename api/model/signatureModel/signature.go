@@ -2,12 +2,10 @@ package signaturemodel
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/sunthewhat/easy-cert-api/common"
-	"github.com/sunthewhat/easy-cert-api/common/util"
-	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/shared/model"
 	"gorm.io/gorm"
@@ -72,6 +70,25 @@ func UpdateSignature(signatureId string, encryptedSignature string) (*model.Sign
 	return updatedSignature, nil
 }
 
+// MarkAsRequested marks a signature as requested and updates the last request timestamp
+func MarkAsRequested(certificateId, signerId string) error {
+	_, err := common.Gorm.Signature.Where(
+		common.Gorm.Signature.CertificateID.Eq(certificateId),
+	).Where(
+		common.Gorm.Signature.SignerID.Eq(signerId),
+	).Updates(map[string]interface{}{
+		"is_requested":  true,
+		"last_request": time.Now(),
+	})
+
+	if err != nil {
+		slog.Error("MarkAsRequested Error", "error", err, "certificateId", certificateId, "signerId", signerId)
+		return err
+	}
+
+	return nil
+}
+
 // BulkCreateSignatures creates signature records for multiple signers for a certificate
 // Skips signers that already have signatures for this certificate
 func BulkCreateSignatures(certificateId string, signerIds []string, userId string) error {
@@ -124,50 +141,28 @@ func BulkCreateSignatures(certificateId string, signerIds []string, userId strin
 	return nil
 }
 
-// BulkSendSignatureRequests sends signature request emails to multiple signers
-func BulkSendSignatureRequests(certificateId, certificateName string, signerIds []string) error {
-	if len(signerIds) == 0 {
-		return nil
+
+// GetPendingSignaturesForReminder returns signatures that need reminder emails
+// (requested but not signed, and last request was more than 24 hours ago)
+func GetPendingSignaturesForReminder() ([]*model.Signature, error) {
+	twentyFourHoursAgo := time.Now().Add(-24 * time.Hour)
+
+	signatures, queryErr := common.Gorm.Signature.Where(
+		common.Gorm.Signature.IsRequested.Is(true),
+	).Where(
+		common.Gorm.Signature.IsSigned.Is(false),
+	).Where(
+		common.Gorm.Signature.LastRequest.Lt(twentyFourHoursAgo),
+	).Find()
+
+	if queryErr != nil {
+		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
+			return []*model.Signature{}, nil
+		}
+		slog.Error("GetPendingSignaturesForReminder Error", "error", queryErr)
+		return nil, queryErr
 	}
 
-	var successCount, failedCount int
-	var lastError error
-
-	for _, signerId := range signerIds {
-		// Get signer details
-		signer, err := signermodel.GetById(signerId)
-		if err != nil {
-			slog.Error("BulkSendSignatureRequests: Error getting signer", "error", err, "signerId", signerId, "certificateId", certificateId)
-			failedCount++
-			lastError = err
-			continue
-		}
-
-		if signer == nil {
-			slog.Warn("BulkSendSignatureRequests: Signer not found", "signerId", signerId, "certificateId", certificateId)
-			failedCount++
-			lastError = fmt.Errorf("signer %s not found", signerId)
-			continue
-		}
-
-		// Send signature request email
-		err = util.SendSignatureRequestMail(signer.Email, signer.DisplayName, certificateId, certificateName)
-		if err != nil {
-			slog.Error("BulkSendSignatureRequests: Failed to send email", "error", err, "signerId", signerId, "email", signer.Email, "certificateId", certificateId)
-			failedCount++
-			lastError = err
-			continue
-		}
-
-		successCount++
-	}
-
-	slog.Info("BulkSendSignatureRequests: Completed", "certificateId", certificateId, "total", len(signerIds), "success", successCount, "failed", failedCount)
-
-	// Only return error if all emails failed
-	if failedCount > 0 && successCount == 0 {
-		return fmt.Errorf("failed to send all signature request emails: %w", lastError)
-	}
-
-	return nil
+	return signatures, nil
 }
+
