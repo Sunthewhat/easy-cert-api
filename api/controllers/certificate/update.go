@@ -1,15 +1,55 @@
 package certificate_controller
 
 import (
+	"encoding/json"
 	"log/slog"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/sunthewhat/easy-cert-api/api/middleware"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
+	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
+
+// extractSignerIdsFromDesign parses the certificate design JSON and extracts all signer IDs
+// from objects with ID pattern "SIGNATURE-{UUID}"
+func extractSignerIdsFromDesign(designJSON string) ([]string, error) {
+	var design map[string]any
+	if err := json.Unmarshal([]byte(designJSON), &design); err != nil {
+		return nil, err
+	}
+
+	objects, ok := design["objects"].([]any)
+	if !ok {
+		return []string{}, nil
+	}
+
+	signerIds := make(map[string]bool)
+	for _, obj := range objects {
+		objMap, ok := obj.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		id, exists := objMap["id"].(string)
+		if exists && strings.HasPrefix(id, "SIGNATURE-") {
+			signerId := strings.TrimPrefix(id, "SIGNATURE-")
+			signerIds[signerId] = true
+		}
+	}
+
+	// Convert map to slice for unique signer IDs
+	result := make([]string, 0, len(signerIds))
+	for signerId := range signerIds {
+		result = append(result, signerId)
+	}
+
+	return result, nil
+}
 
 func Update(c *fiber.Ctx) error {
 	// Get certificate ID from URL parameter
@@ -21,6 +61,10 @@ func Update(c *fiber.Ctx) error {
 	autoSaveQuery := c.Query("autosave")
 
 	isAutoSave := autoSaveQuery == "true"
+
+	shareQuery := c.Query("share")
+
+	isShare := shareQuery == "true"
 
 	// Parse request body
 	body := new(payload.UpdateCertificatePayload)
@@ -56,6 +100,28 @@ func Update(c *fiber.Ctx) error {
 		if cleanupErr != nil {
 			slog.Warn("Failed to cleanup deleted anchors from participants", "error", cleanupErr, "cert_id", id)
 			// Don't fail the update operation if cleanup fails, just log it
+		}
+	}
+
+	// If sharing certificate, create signature records for all signature placeholders
+	if isShare {
+		signerIds, extractErr := extractSignerIdsFromDesign(updatedCert.Design)
+		if extractErr != nil {
+			slog.Warn("Failed to extract signer IDs from certificate design", "error", extractErr, "cert_id", id)
+			// Don't fail the update operation if extraction fails, just log it
+		} else if len(signerIds) > 0 {
+			// Get user ID from context
+			userId, status := middleware.GetUserFromContext(c)
+			if !status {
+				slog.Warn("Failed to get user ID from context when sharing certificate", "cert_id", id)
+				// Don't fail the update operation if user context is missing, just log it
+			} else {
+				bulkCreateErr := signaturemodel.BulkCreateSignatures(id, signerIds, userId)
+				if bulkCreateErr != nil {
+					slog.Warn("Failed to create signatures for certificate", "error", bulkCreateErr, "cert_id", id)
+					// Don't fail the update operation if signature creation fails, just log it
+				}
+			}
 		}
 	}
 
