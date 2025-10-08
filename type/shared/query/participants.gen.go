@@ -34,6 +34,7 @@ func newParticipant(db *gorm.DB, opts ...gen.DOOption) participant {
 	_participant.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_participant.IsDistributed = field.NewBool(tableName, "is_distributed")
 	_participant.CertificateURL = field.NewString(tableName, "certificate_url")
+	_participant.EmailStatus = field.NewString(tableName, "email_status")
 
 	_participant.fillFieldMap()
 
@@ -51,6 +52,7 @@ type participant struct {
 	UpdatedAt      field.Time
 	IsDistributed  field.Bool
 	CertificateURL field.String
+	EmailStatus    field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -74,6 +76,7 @@ func (p *participant) updateTableName(table string) *participant {
 	p.UpdatedAt = field.NewTime(table, "updated_at")
 	p.IsDistributed = field.NewBool(table, "is_distributed")
 	p.CertificateURL = field.NewString(table, "certificate_url")
+	p.EmailStatus = field.NewString(table, "email_status")
 
 	p.fillFieldMap()
 
@@ -90,7 +93,7 @@ func (p *participant) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (p *participant) fillFieldMap() {
-	p.fieldMap = make(map[string]field.Expr, 7)
+	p.fieldMap = make(map[string]field.Expr, 8)
 	p.fieldMap["id"] = p.ID
 	p.fieldMap["certificate_id"] = p.CertificateID
 	p.fieldMap["isrevoke"] = p.Isrevoke
@@ -98,6 +101,7 @@ func (p *participant) fillFieldMap() {
 	p.fieldMap["updated_at"] = p.UpdatedAt
 	p.fieldMap["is_distributed"] = p.IsDistributed
 	p.fieldMap["certificate_url"] = p.CertificateURL
+	p.fieldMap["email_status"] = p.EmailStatus
 }
 
 func (p participant) clone(db *gorm.DB) participant {

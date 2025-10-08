@@ -158,3 +158,13 @@ func MarkParticipantAsDistributed(participantId string) error {
 	slog.Info("ParticipantModel Mark Participant as Distributed success")
 	return nil
 }
+
+func UpdateEmailStatus(participantId string, status string) error {
+	_, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantId)).Update(common.Gorm.Participant.EmailStatus, status)
+	if err != nil {
+		slog.Error("ParticipantModel UpdateEmailStatus failed", "error", err, "participantId", participantId, "status", status)
+		return err
+	}
+	slog.Info("ParticipantModel UpdateEmailStatus success", "participantId", participantId, "status", status)
+	return nil
+}

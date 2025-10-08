@@ -25,6 +25,7 @@ type CombinedParticipant struct {
 	IsRevoke       bool           `json:"is_revoked"`
 	IsDistributed  bool           `json:"is_distributed"`
 	CertificateURL string         `json:"certificate_url"`
+	EmailStatus    string         `json:"email_status"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
 	DynamicData    map[string]any `json:"data"`
@@ -128,6 +129,7 @@ func GetParticipantsByCertId(certId string) ([]*CombinedParticipant, error) {
 			IsRevoke:       pgParticipant.Isrevoke,
 			IsDistributed:  pgParticipant.IsDistributed,
 			CertificateURL: pgParticipant.CertificateURL,
+			EmailStatus:    pgParticipant.EmailStatus,
 			CreatedAt:      pgParticipant.CreatedAt,
 			UpdatedAt:      pgParticipant.UpdatedAt,
 			DynamicData:    make(map[string]any),
@@ -172,6 +174,7 @@ func GetParticipantsById(participantId string) (*CombinedParticipant, error) {
 		IsRevoke:       participant.Isrevoke,
 		IsDistributed:  participant.IsDistributed,
 		CertificateURL: participant.CertificateURL,
+		EmailStatus:    participant.EmailStatus,
 		CreatedAt:      participant.CreatedAt,
 		UpdatedAt:      participant.UpdatedAt,
 		DynamicData:    make(map[string]any),
@@ -246,6 +249,7 @@ func EditParticipantByID(participantID string, newData map[string]any) (*Combine
 		IsRevoke:       participant.Isrevoke,
 		IsDistributed:  participant.IsDistributed,
 		CertificateURL: participant.CertificateURL,
+		EmailStatus:    participant.EmailStatus,
 		CreatedAt:      participant.CreatedAt,
 		UpdatedAt:      time.Now(), // Use current time for updated_at
 		DynamicData:    newData,

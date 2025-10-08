@@ -19,6 +19,7 @@ type Participant struct {
 	UpdatedAt      time.Time `gorm:"column:updated_at;not null;default:now()" json:"updated_at"`
 	IsDistributed  bool      `gorm:"column:is_distributed" json:"is_distributed"`
 	CertificateURL string    `gorm:"column:certificate_url" json:"certificate_url"`
+	EmailStatus    string    `gorm:"column:email_status;not null;default:pending" json:"email_status"`
 }
 
 // TableName Participant's table name

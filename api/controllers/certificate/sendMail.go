@@ -47,6 +47,8 @@ func DistributeByMail(c *fiber.Ctx) error {
 			participantInfo["error"] = "Certificate URL not found"
 			failedResults = append(failedResults, participantInfo)
 			slog.Error("Attempt to send mail without certificate url", "certId", certId, "participantId", participant.ID)
+			// Update email status to failed
+			participantmodel.UpdateEmailStatus(participant.ID, "failed")
 			continue
 		}
 
@@ -59,6 +61,8 @@ func DistributeByMail(c *fiber.Ctx) error {
 				"certId", certId,
 				"participantId", participant.ID,
 				"emailField", emailField)
+			// Update email status to failed
+			participantmodel.UpdateEmailStatus(participant.ID, "failed")
 			continue
 		}
 
@@ -72,6 +76,8 @@ func DistributeByMail(c *fiber.Ctx) error {
 				"participantId", participant.ID,
 				"emailField", emailField,
 				"emailValue", emailValue)
+			// Update email status to failed
+			participantmodel.UpdateEmailStatus(participant.ID, "failed")
 			continue
 		}
 
@@ -81,6 +87,8 @@ func DistributeByMail(c *fiber.Ctx) error {
 			slog.Warn("Empty email address",
 				"certId", certId,
 				"participantId", participant.ID)
+			// Update email status to failed
+			participantmodel.UpdateEmailStatus(participant.ID, "failed")
 			continue
 		}
 
@@ -95,8 +103,18 @@ func DistributeByMail(c *fiber.Ctx) error {
 				"certId", certId,
 				"participantId", participant.ID,
 				"email", email)
+			// Update email status to failed
+			participantmodel.UpdateEmailStatus(participant.ID, "failed")
 		} else {
-			err := participantmodel.MarkParticipantAsDistributed(participant.ID)
+			// Update email status to success
+			err := participantmodel.UpdateEmailStatus(participant.ID, "success")
+			if err != nil {
+				slog.Warn("Failed to update email status to success",
+					"error", err,
+					"participantId", participant.ID)
+			}
+
+			err = participantmodel.MarkParticipantAsDistributed(participant.ID)
 			if err != nil {
 				participantInfo["error"] = err.Error()
 				failedResults = append(failedResults, participantInfo)
