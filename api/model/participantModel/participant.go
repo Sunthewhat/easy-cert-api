@@ -23,9 +23,9 @@ type CombinedParticipant struct {
 	ID             string         `json:"id"`
 	CertificateID  string         `json:"certificate_id"`
 	IsRevoke       bool           `json:"is_revoked"`
-	IsDistributed  bool           `json:"is_distributed"`
 	CertificateURL string         `json:"certificate_url"`
 	EmailStatus    string         `json:"email_status"`
+	IsDownloaded   bool           `json:"is_downloaded"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
 	DynamicData    map[string]any `json:"data"`
@@ -127,9 +127,9 @@ func GetParticipantsByCertId(certId string) ([]*CombinedParticipant, error) {
 			ID:             pgParticipant.ID,
 			CertificateID:  pgParticipant.CertificateID,
 			IsRevoke:       pgParticipant.Isrevoke,
-			IsDistributed:  pgParticipant.IsDistributed,
 			CertificateURL: pgParticipant.CertificateURL,
 			EmailStatus:    pgParticipant.EmailStatus,
+			IsDownloaded:   pgParticipant.IsDownloaded,
 			CreatedAt:      pgParticipant.CreatedAt,
 			UpdatedAt:      pgParticipant.UpdatedAt,
 			DynamicData:    make(map[string]any),
@@ -172,9 +172,9 @@ func GetParticipantsById(participantId string) (*CombinedParticipant, error) {
 		ID:             participant.ID,
 		CertificateID:  participant.CertificateID,
 		IsRevoke:       participant.Isrevoke,
-		IsDistributed:  participant.IsDistributed,
 		CertificateURL: participant.CertificateURL,
 		EmailStatus:    participant.EmailStatus,
+		IsDownloaded:   participant.IsDownloaded,
 		CreatedAt:      participant.CreatedAt,
 		UpdatedAt:      participant.UpdatedAt,
 		DynamicData:    make(map[string]any),
@@ -247,9 +247,9 @@ func EditParticipantByID(participantID string, newData map[string]any) (*Combine
 		ID:             participant.ID,
 		CertificateID:  participant.CertificateID,
 		IsRevoke:       participant.Isrevoke,
-		IsDistributed:  participant.IsDistributed,
 		CertificateURL: participant.CertificateURL,
 		EmailStatus:    participant.EmailStatus,
+		IsDownloaded:   participant.IsDownloaded,
 		CreatedAt:      participant.CreatedAt,
 		UpdatedAt:      time.Now(), // Use current time for updated_at
 		DynamicData:    newData,

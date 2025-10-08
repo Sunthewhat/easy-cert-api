@@ -17,9 +17,9 @@ type Participant struct {
 	Isrevoke       bool      `gorm:"column:isrevoke;not null" json:"isrevoke"`
 	CreatedAt      time.Time `gorm:"column:created_at;not null;default:now()" json:"created_at"`
 	UpdatedAt      time.Time `gorm:"column:updated_at;not null;default:now()" json:"updated_at"`
-	IsDistributed  bool      `gorm:"column:is_distributed" json:"is_distributed"`
 	CertificateURL string    `gorm:"column:certificate_url" json:"certificate_url"`
 	EmailStatus    string    `gorm:"column:email_status;not null;default:pending" json:"email_status"`
+	IsDownloaded   bool      `gorm:"column:is_downloaded;not null" json:"is_downloaded"`
 }
 
 // TableName Participant's table name

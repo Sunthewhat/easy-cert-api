@@ -114,12 +114,6 @@ func DistributeByMail(c *fiber.Ctx) error {
 					"participantId", participant.ID)
 			}
 
-			err = participantmodel.MarkParticipantAsDistributed(participant.ID)
-			if err != nil {
-				participantInfo["error"] = err.Error()
-				failedResults = append(failedResults, participantInfo)
-				continue
-			}
 			successResults = append(successResults, participantInfo)
 			slog.Info("Mail sent successfully",
 				"certId", certId,

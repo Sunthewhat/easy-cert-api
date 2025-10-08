@@ -79,9 +79,7 @@ func UpdateIsDistribute(c *fiber.Ctx) error {
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			err := participantmodel.MarkParticipantAsDistributed(id)
-
-			participantmodel.UpdateEmailStatus(id, "downloaded")
+			err := participantmodel.UpdateDownloadStatus(id, true)
 
 			// Thread-safe result storage
 			mu.Lock()

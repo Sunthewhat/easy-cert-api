@@ -36,6 +36,7 @@ func newCertificate(db *gorm.DB, opts ...gen.DOOption) certificate {
 	_certificate.ThumbnailURL = field.NewString(tableName, "thumbnail_url")
 	_certificate.ArchiveURL = field.NewString(tableName, "archive_url")
 	_certificate.IsDistributed = field.NewBool(tableName, "is_distributed")
+	_certificate.IsSigned = field.NewBool(tableName, "is_signed")
 
 	_certificate.fillFieldMap()
 
@@ -55,6 +56,7 @@ type certificate struct {
 	ThumbnailURL  field.String
 	ArchiveURL    field.String
 	IsDistributed field.Bool
+	IsSigned      field.Bool
 
 	fieldMap map[string]field.Expr
 }
@@ -80,6 +82,7 @@ func (c *certificate) updateTableName(table string) *certificate {
 	c.ThumbnailURL = field.NewString(table, "thumbnail_url")
 	c.ArchiveURL = field.NewString(table, "archive_url")
 	c.IsDistributed = field.NewBool(table, "is_distributed")
+	c.IsSigned = field.NewBool(table, "is_signed")
 
 	c.fillFieldMap()
 
@@ -96,7 +99,7 @@ func (c *certificate) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (c *certificate) fillFieldMap() {
-	c.fieldMap = make(map[string]field.Expr, 9)
+	c.fieldMap = make(map[string]field.Expr, 10)
 	c.fieldMap["id"] = c.ID
 	c.fieldMap["name"] = c.Name
 	c.fieldMap["design"] = c.Design
@@ -106,6 +109,7 @@ func (c *certificate) fillFieldMap() {
 	c.fieldMap["thumbnail_url"] = c.ThumbnailURL
 	c.fieldMap["archive_url"] = c.ArchiveURL
 	c.fieldMap["is_distributed"] = c.IsDistributed
+	c.fieldMap["is_signed"] = c.IsSigned
 }
 
 func (c certificate) clone(db *gorm.DB) certificate {

@@ -21,6 +21,7 @@ type Certificate struct {
 	ThumbnailURL  string    `gorm:"column:thumbnail_url" json:"thumbnail_url"`
 	ArchiveURL    string    `gorm:"column:archive_url" json:"archive_url"`
 	IsDistributed bool      `gorm:"column:is_distributed;not null" json:"is_distributed"`
+	IsSigned      bool      `gorm:"column:is_signed;not null" json:"is_signed"`
 }
 
 // TableName Certificate's table name

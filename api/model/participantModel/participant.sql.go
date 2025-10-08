@@ -149,16 +149,6 @@ func UpdateParticipantCertificateUrlInPostgres(participantId string, certificate
 	return nil
 }
 
-func MarkParticipantAsDistributed(participantId string) error {
-	_, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantId)).Update(common.Gorm.Participant.IsDistributed, true)
-	if err != nil {
-		slog.Error("Participant Model Mark Participant As Distributed Failed", "error", err, "participantId", participantId)
-		return err
-	}
-	slog.Info("ParticipantModel Mark Participant as Distributed success")
-	return nil
-}
-
 func UpdateEmailStatus(participantId string, status string) error {
 	_, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantId)).Update(common.Gorm.Participant.EmailStatus, status)
 	if err != nil {
@@ -167,4 +157,16 @@ func UpdateEmailStatus(participantId string, status string) error {
 	}
 	slog.Info("ParticipantModel UpdateEmailStatus success", "participantId", participantId, "status", status)
 	return nil
+}
+
+func UpdateDownloadStatus(participantId string, status bool) error {
+	_, err := common.Gorm.Participant.Where(common.Gorm.Participant.ID.Eq(participantId)).Update(common.Gorm.Participant.IsDownloaded, status)
+
+	if err != nil {
+		slog.Error("ParticipantModel UpdateDownloadStatus failed", "error", err, "participantId", participantId)
+		return err
+	}
+	slog.Info("ParticipantModel UpdateDownloadStatus success", "participantId", participantId, "status", status)
+	return nil
+
 }

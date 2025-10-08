@@ -73,7 +73,7 @@ func Render(c *fiber.Ctx) error {
 	} else {
 		// Only renew participants that haven't been distributed
 		for _, p := range allParticipants {
-			if !p.IsDistributed {
+			if p.EmailStatus != "success" {
 				participants = append(participants, p)
 			}
 		}
