@@ -83,6 +83,27 @@ func Render(c *fiber.Ctx) error {
 			"to_renew_count", len(participants))
 	}
 
+	// Reset participant statuses (email_status to "pending" and is_downloaded to false)
+	if len(participants) > 0 {
+		participantIds := make([]string, len(participants))
+		for i, p := range participants {
+			participantIds[i] = p.ID
+		}
+
+		err = participantmodel.ResetParticipantStatuses(participantIds)
+		if err != nil {
+			slog.Warn("Certificate Render: Failed to reset participant statuses",
+				"error", err,
+				"cert_id", certId,
+				"participant_count", len(participantIds))
+			// Don't fail the operation, just log the warning
+		} else {
+			slog.Info("Certificate Render: Reset participant statuses successfully",
+				"cert_id", certId,
+				"participant_count", len(participantIds))
+		}
+	}
+
 	// Delete old zip archive file
 	if cert.ArchiveURL != "" {
 		slog.Info("Certificate Render: Deleting old zip archive",

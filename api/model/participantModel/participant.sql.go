@@ -170,3 +170,25 @@ func UpdateDownloadStatus(participantId string, status bool) error {
 	return nil
 
 }
+
+// ResetParticipantStatuses resets email_status to "pending" and is_downloaded to false for multiple participants
+func ResetParticipantStatuses(participantIds []string) error {
+	if len(participantIds) == 0 {
+		return nil
+	}
+
+	_, err := common.Gorm.Participant.Where(
+		common.Gorm.Participant.ID.In(participantIds...),
+	).Updates(map[string]any{
+		"email_status":  "pending",
+		"is_downloaded": false,
+	})
+
+	if err != nil {
+		slog.Error("ParticipantModel ResetParticipantStatuses failed", "error", err, "count", len(participantIds))
+		return err
+	}
+
+	slog.Info("ParticipantModel ResetParticipantStatuses success", "count", len(participantIds))
+	return nil
+}

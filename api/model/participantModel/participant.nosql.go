@@ -249,57 +249,57 @@ func ValidateFieldConsistency(certId string, newParticipants []map[string]any) e
 	return nil
 }
 
-// areFieldsConsistent checks if two field slices contain the same elements (ignoring auto-added fields)
-func areFieldsConsistent(existing, new []string) bool {
-	// Filter out auto-added fields from comparison
-	autoFields := []string{"certificate_id", "created_at", "updated_at"}
+// // areFieldsConsistent checks if two field slices contain the same elements (ignoring auto-added fields)
+// func areFieldsConsistent(existing, new []string) bool {
+// 	// Filter out auto-added fields from comparison
+// 	autoFields := []string{"certificate_id", "created_at", "updated_at"}
 
-	existingFiltered := filterOutFields(existing, autoFields)
-	newFiltered := filterOutFields(new, autoFields)
+// 	existingFiltered := filterOutFields(existing, autoFields)
+// 	newFiltered := filterOutFields(new, autoFields)
 
-	if len(existingFiltered) != len(newFiltered) {
-		return false
-	}
+// 	if len(existingFiltered) != len(newFiltered) {
+// 		return false
+// 	}
 
-	for i, field := range existingFiltered {
-		if field != newFiltered[i] {
-			return false
-		}
-	}
-	return true
-}
+// 	for i, field := range existingFiltered {
+// 		if field != newFiltered[i] {
+// 			return false
+// 		}
+// 	}
+// 	return true
+// }
 
 // filterOutFields removes specified fields from a slice
-func filterOutFields(fields, toRemove []string) []string {
-	var result []string
-	removeMap := make(map[string]bool)
-	for _, field := range toRemove {
-		removeMap[field] = true
-	}
+// func filterOutFields(fields, toRemove []string) []string {
+// 	var result []string
+// 	removeMap := make(map[string]bool)
+// 	for _, field := range toRemove {
+// 		removeMap[field] = true
+// 	}
 
-	for _, field := range fields {
-		if !removeMap[field] {
-			result = append(result, field)
-		}
-	}
-	return result
-}
+// 	for _, field := range fields {
+// 		if !removeMap[field] {
+// 			result = append(result, field)
+// 		}
+// 	}
+// 	return result
+// }
 
 // findMissingFields returns fields that are in 'required' but not in 'actual'
-func findMissingFields(required, actual []string) []string {
-	actualMap := make(map[string]bool)
-	for _, field := range actual {
-		actualMap[field] = true
-	}
+// func findMissingFields(required, actual []string) []string {
+// 	actualMap := make(map[string]bool)
+// 	for _, field := range actual {
+// 		actualMap[field] = true
+// 	}
 
-	var missing []string
-	for _, field := range required {
-		if !actualMap[field] {
-			missing = append(missing, field)
-		}
-	}
-	return missing
-}
+// 	var missing []string
+// 	for _, field := range required {
+// 		if !actualMap[field] {
+// 			missing = append(missing, field)
+// 		}
+// 	}
+// 	return missing
+// }
 
 // DeleteCollectionByCertId deletes the entire MongoDB collection for a certificate
 func DeleteCollectionByCertIdFromMongo(certId string) error {
