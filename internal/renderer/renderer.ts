@@ -279,30 +279,6 @@ async function generateCertificateImage(
 		// Replace placeholders with participant data
 		const processedDesign = replacePlaceholders(certificate.design, participant, qrCode);
 
-		// Debug: Save the processed design to file
-		// try {
-		// const timestamp = Date.now();
-		// const debugDir = '/tmp';
-		// const debugFileName = `${debugDir}/processed_design_${participant.id}_${timestamp}.json`;
-		// await Bun.write(debugFileName, JSON.stringify(JSON.parse(processedDesign), null, 2));
-		// console.error(`DEBUG: Processed design saved to ${debugFileName}`);
-
-		// Also save original design for comparison
-		// const originalFileName = `${debugDir}/original_design_${participant.id}_${timestamp}.json`;
-		// await Bun.write(
-		// 	originalFileName,
-		// 	JSON.stringify(JSON.parse(certificate.design), null, 2)
-		// );
-		// console.error(`DEBUG: Original design saved to ${originalFileName}`);
-
-		// Save participant data
-		// const participantFileName = `${debugDir}/participant_data_${participant.id}_${timestamp}.json`;
-		// await Bun.write(participantFileName, JSON.stringify(participant, null, 2));
-		// console.error(`DEBUG: Participant data saved to ${participantFileName}`);
-		// } catch (debugError) {
-		// console.error(`DEBUG: Failed to save debug files: ${debugError}`);
-		// }
-
 		// Load canvas
 		const canvas = await loadCanvasWithImageFallback(processedDesign);
 
