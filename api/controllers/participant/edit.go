@@ -81,6 +81,8 @@ func UpdateIsDistribute(c *fiber.Ctx) error {
 
 			err := participantmodel.MarkParticipantAsDistributed(id)
 
+			participantmodel.UpdateEmailStatus(id, "downloaded")
+
 			// Thread-safe result storage
 			mu.Lock()
 			if err != nil {

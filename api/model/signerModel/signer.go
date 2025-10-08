@@ -40,3 +40,17 @@ func GetByUser(userId string) ([]*model.Signer, error) {
 
 	return signers, nil
 }
+
+func GetById(signerId string) (*model.Signer, error) {
+	signer, queryErr := common.Gorm.Signer.Where(common.Gorm.Signer.ID.Eq(signerId)).First()
+
+	if queryErr != nil {
+		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		slog.Error("Get Signer by Id Error", "error", queryErr, "signerId", signerId)
+		return nil, queryErr
+	}
+
+	return signer, nil
+}
