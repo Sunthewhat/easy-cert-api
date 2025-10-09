@@ -8,7 +8,7 @@ declare const Bun: {
 	write: (path: string, content: string) => Promise<void>;
 };
 
-import { fabric } from 'fabric';
+import { fabric } from "fabric";
 
 interface PlaceholderObject {
 	id: string;
@@ -32,23 +32,24 @@ interface RenderRequest {
 	participants: ParticipantData[];
 	qrCodes?: { [participantId: string]: string }; // base64 QR codes from Go
 	signatures?: { [signerId: string]: string }; // base64 signature images from Go
+	watermark?: string; // base64 watermark image from Go
 }
 
 interface ThumbnailRequest {
 	certificate: CertificateData;
-	mode: 'thumbnail';
+	mode: "thumbnail";
 }
 
 interface RenderResult {
 	participantId: string;
 	imageBase64: string;
-	status: 'success' | 'error';
+	status: "success" | "error";
 	error?: string;
 }
 
 interface ThumbnailResult {
 	imageBase64: string;
-	status: 'success' | 'error';
+	status: "success" | "error";
 	error?: string;
 }
 
@@ -57,14 +58,19 @@ function replacePlaceholders(
 	designStr: string,
 	participant: ParticipantData,
 	qrCode?: string,
-	signatures?: { [signerId: string]: string }
+	signatures?: { [signerId: string]: string },
+	watermark?: string
 ): string {
 	try {
 		const design = JSON.parse(designStr);
 
 		if (design.objects && Array.isArray(design.objects)) {
 			console.error(
-				`DEBUG: Processing ${design.objects.length} objects, QR code available: ${!!qrCode}, signatures available: ${!!signatures}, signature count: ${signatures ? Object.keys(signatures).length : 0}`
+				`DEBUG: Processing ${
+					design.objects.length
+				} objects, QR code available: ${!!qrCode}, signatures available: ${!!signatures}, signature count: ${
+					signatures ? Object.keys(signatures).length : 0
+				}`
 			);
 
 			design.objects = design.objects.map((obj: PlaceholderObject) => {
@@ -76,10 +82,10 @@ function replacePlaceholders(
 				if (
 					obj.isAnchor &&
 					obj.id &&
-					(obj.type === 'Group' || obj.type === 'group') &&
-					obj.id.startsWith('PLACEHOLDER-')
+					(obj.type === "Group" || obj.type === "group") &&
+					obj.id.startsWith("PLACEHOLDER-")
 				) {
-					const fieldName = obj.id.replace('PLACEHOLDER-', '');
+					const fieldName = obj.id.replace("PLACEHOLDER-", "");
 					// Check both participant.fieldName and participant.data.fieldName
 					const fieldValue =
 						participant[fieldName] || (participant.data && participant.data[fieldName]);
@@ -87,12 +93,12 @@ function replacePlaceholders(
 					if (fieldValue && obj.objects && Array.isArray(obj.objects)) {
 						// Remove Rect objects from the group (dotted borders) and keep only textbox
 						const filteredObjects = obj.objects.filter(
-							(subObj: any) => subObj.type !== 'Rect' && subObj.type !== 'rect'
+							(subObj: any) => subObj.type !== "Rect" && subObj.type !== "rect"
 						);
 
 						// Find and update the textbox within the group
 						const updatedObjects = filteredObjects.map((subObj: any) => {
-							if (subObj.type === 'Textbox' || subObj.type === 'textbox') {
+							if (subObj.type === "Textbox" || subObj.type === "textbox") {
 								return { ...subObj, text: fieldValue };
 							}
 							return subObj;
@@ -106,10 +112,10 @@ function replacePlaceholders(
 				else if (
 					obj.isAnchor &&
 					obj.id &&
-					(obj.type === 'Textbox' || obj.type === 'textbox') &&
-					obj.id.startsWith('PLACEHOLDER-')
+					(obj.type === "Textbox" || obj.type === "textbox") &&
+					obj.id.startsWith("PLACEHOLDER-")
 				) {
-					const fieldName = obj.id.replace('PLACEHOLDER-', '');
+					const fieldName = obj.id.replace("PLACEHOLDER-", "");
 					// Check both participant.fieldName and participant.data.fieldName
 					const fieldValue =
 						participant[fieldName] || (participant.data && participant.data[fieldName]);
@@ -120,8 +126,8 @@ function replacePlaceholders(
 				}
 
 				// Handle simple ID-based placeholders (backward compatibility)
-				else if (obj.id && obj.id.startsWith('PLACEHOLDER-')) {
-					const fieldName = obj.id.replace('PLACEHOLDER-', '');
+				else if (obj.id && obj.id.startsWith("PLACEHOLDER-")) {
+					const fieldName = obj.id.replace("PLACEHOLDER-", "");
 					// Check both participant.fieldName and participant.data.fieldName
 					const fieldValue =
 						participant[fieldName] || (participant.data && participant.data[fieldName]);
@@ -131,15 +137,15 @@ function replacePlaceholders(
 				}
 
 				// Replace QR anchor with QR code if provided - check for qr-anchor anywhere in ID
-				if (obj.id && obj.id.includes('qr-anchor') && qrCode) {
+				if (obj.id && obj.id.includes("qr-anchor") && qrCode) {
 					console.error(
 						`DEBUG: Found QR anchor ${obj.id}, replacing with QR code (length: ${qrCode.length})`
 					);
 					return {
 						...obj,
-						type: 'Image',
+						type: "Image",
 						src: `data:image/png;base64,${qrCode}`,
-						crossOrigin: 'anonymous',
+						crossOrigin: "anonymous",
 						// Remove dotted border styling
 						stroke: null,
 						strokeDashArray: null,
@@ -151,8 +157,8 @@ function replacePlaceholders(
 				}
 
 				// Handle SIGNATURE-{UUID} placeholders - Replace with real signature
-				if (obj.id && obj.id.startsWith('SIGNATURE-') && signatures) {
-					const signerId = obj.id.replace('SIGNATURE-', '');
+				if (obj.id && obj.id.startsWith("SIGNATURE-") && signatures) {
+					const signerId = obj.id.replace("SIGNATURE-", "");
 					const signatureBase64 = signatures[signerId];
 
 					if (signatureBase64) {
@@ -167,8 +173,8 @@ function replacePlaceholders(
 						const placeholderHeight = obj.height || 180;
 						const placeholderScaleX = obj.scaleX || 1;
 						const placeholderScaleY = obj.scaleY || 1;
-						const placeholderOriginX = obj.originX || 'left';
-						const placeholderOriginY = obj.originY || 'top';
+						const placeholderOriginX = obj.originX || "left";
+						const placeholderOriginY = obj.originY || "top";
 
 						console.error(
 							`DEBUG: Placeholder - left: ${placeholderLeft}, top: ${placeholderTop}, width: ${placeholderWidth}, height: ${placeholderHeight}, scaleX: ${placeholderScaleX}, scaleY: ${placeholderScaleY}, originX: ${placeholderOriginX}, originY: ${placeholderOriginY}`
@@ -179,78 +185,111 @@ function replacePlaceholders(
 						const centerOffsetX = -(placeholderWidth / 2);
 						const centerOffsetY = -(placeholderHeight / 2);
 
+						// Signature image from frontend is always 800x450 (16:9 landscape)
+						const SIGNATURE_NATIVE_WIDTH = 800;
+						const SIGNATURE_NATIVE_HEIGHT = 450;
+
+						// Calculate scale factor to fit signature into placeholder
+						// Since both are 16:9, we can use either dimension
+						const imageScale = placeholderWidth / SIGNATURE_NATIVE_WIDTH;
+
+						console.error(
+							`DEBUG: Signature scaling - native: ${SIGNATURE_NATIVE_WIDTH}x${SIGNATURE_NATIVE_HEIGHT}, placeholder: ${placeholderWidth}x${placeholderHeight}, scale: ${imageScale}`
+						);
+
 						// Create signature image matching the structure from test.json
 						const signatureImage = {
 							cropX: 0,
 							cropY: 0,
-							type: 'Image',
-							version: '6.7.1',
+							type: "Image",
+							version: "6.7.1",
 							originX: placeholderOriginX,
 							originY: placeholderOriginY,
-							left: centerOffsetX,  // Offset to center in group
-							top: centerOffsetY,   // Offset to center in group
-							width: placeholderWidth,
-							height: placeholderHeight,
-							fill: 'rgb(0,0,0)',
+							left: centerOffsetX, // Offset to center in group
+							top: centerOffsetY, // Offset to center in group
+							width: SIGNATURE_NATIVE_WIDTH, // Use native dimensions
+							height: SIGNATURE_NATIVE_HEIGHT, // Use native dimensions
+							fill: "rgb(0,0,0)",
 							stroke: null,
 							strokeWidth: 0,
 							strokeDashArray: null,
-							strokeLineCap: 'butt',
+							strokeLineCap: "butt",
 							strokeDashOffset: 0,
-							strokeLineJoin: 'miter',
+							strokeLineJoin: "miter",
 							strokeUniform: false,
 							strokeMiterLimit: 4,
-							scaleX: 1,
-							scaleY: 1,
+							scaleX: imageScale, // Scale to fit placeholder
+							scaleY: imageScale, // Scale to fit placeholder
 							angle: 0,
 							flipX: false,
 							flipY: false,
 							opacity: 1,
 							shadow: null,
 							visible: true,
-							backgroundColor: '',
-							fillRule: 'nonzero',
-							paintFirst: 'fill',
-							globalCompositeOperation: 'source-over',
+							backgroundColor: "",
+							fillRule: "nonzero",
+							paintFirst: "fill",
+							globalCompositeOperation: "source-over",
 							skewX: 0,
 							skewY: 0,
 							src: `data:image/png;base64,${signatureBase64}`,
-							crossOrigin: 'anonymous',
+							crossOrigin: "anonymous",
 							filters: [],
 						};
 
-						// Add watermark text overlay
-						const watermarkText = {
-							type: 'Text',
-							text: 'VERIFIED',
-							version: '6.7.1',
-							originX: 'center',
-							originY: 'center',
-							left: 0,  // Center of group
-							top: 0,   // Center of group
-							fontSize: Math.min(placeholderWidth * 0.15, 24),
-							fontFamily: 'Arial',
-							fontWeight: 'bold',
-							fill: 'rgba(0, 0, 0, 0.3)',
-							stroke: null,
-							strokeWidth: 1,
-							angle: -20,
-							opacity: 0.8,
-							visible: true,
-							textAlign: 'center',
-							backgroundColor: '',
-							paintFirst: 'fill',
-							globalCompositeOperation: 'source-over',
-						};
+						// Add watermark image overlay (if watermark is provided)
+						const children: any[] = [signatureImage];
+
+						if (watermark) {
+							// Calculate watermark size - smaller scale
+							const watermarkWidth = placeholderWidth * 0.45;
+							const watermarkScale = watermarkWidth / 512; // Scale from native 512px width
+
+							const watermarkImage = {
+								cropX: 0,
+								cropY: 0,
+								type: "Image",
+								version: "6.7.1",
+								originX: "center",
+								originY: "center",
+								left: 0, // Center of group
+								top: 0, // Center of group
+								width: 756, // Native width
+								height: 193, // Native height
+								scaleX: watermarkScale,
+								scaleY: watermarkScale,
+								angle: 0, // No tilt - straight watermark
+								opacity: 0.3,
+								visible: true,
+								fill: "rgb(0,0,0)",
+								stroke: null,
+								strokeWidth: 0,
+								backgroundColor: "",
+								fillRule: "nonzero",
+								paintFirst: "fill",
+								globalCompositeOperation: "source-over",
+								skewX: 0,
+								skewY: 0,
+								src: `data:image/png;base64,${watermark}`,
+								crossOrigin: "anonymous",
+								filters: [],
+							};
+
+							children.push(watermarkImage);
+
+							console.error(
+								`DEBUG: Watermark image added - width: ${watermarkWidth}, scale: ${watermarkScale}, opacity: 0.3`
+							);
+						}
 
 						console.error(
-							`DEBUG: Signature image created - left: ${centerOffsetX}, top: ${centerOffsetY}, watermark at center (0, 0)`
+							`DEBUG: Signature image created - left: ${centerOffsetX}, top: ${centerOffsetY}, children count: ${children.length}`
 						);
 
 						// Return a complete Group matching test.json structure
 						return {
-							...obj,  // Keep all original properties
-							objects: [signatureImage, watermarkText],  // Replace children with signature + watermark
+							...obj, // Keep all original properties
+							objects: children, // Replace children with signature + optional watermark
 						};
 					}
 				}
@@ -258,11 +297,11 @@ function replacePlaceholders(
 				// Remove standalone dotted rect anchors that are not QR codes
 				if (
 					obj.id &&
-					obj.id.includes('anchor') &&
-					(obj.type === 'Rect' || obj.type === 'rect') &&
+					obj.id.includes("anchor") &&
+					(obj.type === "Rect" || obj.type === "rect") &&
 					obj.strokeDashArray &&
 					Array.isArray(obj.strokeDashArray) &&
-					!obj.id.includes('qr-anchor')
+					!obj.id.includes("qr-anchor")
 				) {
 					// This is likely a dotted border anchor - hide it in final render
 					return { ...obj, visible: false };
@@ -290,12 +329,12 @@ function cleanDesignForThumbnail(design: any): any {
 	const cleanedObjects = design.objects.map((obj: any) => {
 		// Handle grouped anchors - remove Rect objects from groups
 		if (
-			(obj.type === 'Group' || obj.type === 'group') &&
+			(obj.type === "Group" || obj.type === "group") &&
 			obj.objects &&
 			Array.isArray(obj.objects)
 		) {
 			const filteredObjects = obj.objects.filter(
-				(subObj: any) => subObj.type !== 'Rect' && subObj.type !== 'rect'
+				(subObj: any) => subObj.type !== "Rect" && subObj.type !== "rect"
 			);
 			return { ...obj, objects: filteredObjects };
 		}
@@ -303,8 +342,8 @@ function cleanDesignForThumbnail(design: any): any {
 		// Hide standalone dotted rect anchors
 		if (
 			obj.id &&
-			obj.id.includes('anchor') &&
-			(obj.type === 'Rect' || obj.type === 'rect') &&
+			obj.id.includes("anchor") &&
+			(obj.type === "Rect" || obj.type === "rect") &&
 			obj.strokeDashArray &&
 			Array.isArray(obj.strokeDashArray)
 		) {
@@ -328,7 +367,7 @@ async function loadCanvasWithImageFallback(designStr: string): Promise<fabric.Ca
 	const canvas = new fabric.Canvas(null, {
 		width: design.width || 850,
 		height: design.height || 600,
-		backgroundColor: design.background || '#ffffff',
+		backgroundColor: design.background || "#ffffff",
 		renderOnAddRemove: false, // Prevent automatic rendering for better performance
 		enableRetinaScaling: true, // Enable retina/high-DPI scaling
 	});
@@ -337,16 +376,16 @@ async function loadCanvasWithImageFallback(designStr: string): Promise<fabric.Ca
 	if (design.objects && Array.isArray(design.objects)) {
 		design.objects = design.objects.map((obj: any) => {
 			if (
-				obj.type === 'Textbox' ||
-				obj.type === 'textbox' ||
-				obj.type === 'Text' ||
-				obj.type === 'text'
+				obj.type === "Textbox" ||
+				obj.type === "textbox" ||
+				obj.type === "Text" ||
+				obj.type === "text"
 			) {
 				// Ensure font fallbacks for production
-				if (obj.fontFamily && !obj.fontFamily.includes(',')) {
+				if (obj.fontFamily && !obj.fontFamily.includes(",")) {
 					obj.fontFamily = `${obj.fontFamily}, Arial, sans-serif`;
 				} else if (!obj.fontFamily) {
-					obj.fontFamily = 'Arial, sans-serif';
+					obj.fontFamily = "Arial, sans-serif";
 				}
 				console.error(`DEBUG: Text object font: ${obj.fontFamily}, text: "${obj.text}"`);
 			}
@@ -364,10 +403,10 @@ async function loadCanvasWithImageFallback(designStr: string): Promise<fabric.Ca
 			},
 			(_o: any, object: any) => {
 				// Handle individual object loading errors
-				if (object.type === 'image' && object.src) {
+				if (object.type === "image" && object.src) {
 					// Fallback for WebP images - replace with PNG/JPG
-					if (object.src.includes('.webp')) {
-						object.src = object.src.replace('.webp', '.png');
+					if (object.src.includes(".webp")) {
+						object.src = object.src.replace(".webp", ".png");
 					}
 				}
 			}
@@ -382,11 +421,18 @@ async function generateCertificateImage(
 	certificate: CertificateData,
 	participant: ParticipantData,
 	qrCode?: string,
-	signatures?: { [signerId: string]: string }
+	signatures?: { [signerId: string]: string },
+	watermark?: string
 ): Promise<RenderResult> {
 	try {
 		// Replace placeholders with participant data
-		const processedDesign = replacePlaceholders(certificate.design, participant, qrCode, signatures);
+		const processedDesign = replacePlaceholders(
+			certificate.design,
+			participant,
+			qrCode,
+			signatures,
+			watermark
+		);
 
 		// Load canvas
 		const canvas = await loadCanvasWithImageFallback(processedDesign);
@@ -394,23 +440,23 @@ async function generateCertificateImage(
 		// Export as base64 with high quality settings
 		const imageBase64 = canvas
 			.toDataURL({
-				format: 'png',
+				format: "png",
 				quality: 1.0, // Maximum quality
 				multiplier: 2, // 2x resolution for crisp output
 			})
-			.split(',')[1];
+			.split(",")[1];
 
 		return {
 			participantId: participant.id,
 			imageBase64,
-			status: 'success',
+			status: "success",
 		};
 	} catch (error) {
 		return {
 			participantId: participant.id,
-			imageBase64: '',
-			status: 'error',
-			error: error instanceof Error ? error.message : 'Unknown error',
+			imageBase64: "",
+			status: "error",
+			error: error instanceof Error ? error.message : "Unknown error",
 		};
 	}
 }
@@ -432,7 +478,7 @@ async function generateCertificateThumbnail(
 			width: originalWidth,
 			height: originalHeight,
 			// backgroundColor: design.background || '#ffffff',
-			backgroundColor: '#ffffff',
+			backgroundColor: "#ffffff",
 			renderOnAddRemove: false, // Prevent automatic rendering for better performance
 			enableRetinaScaling: true, // Enable retina/high-DPI scaling
 		});
@@ -450,10 +496,10 @@ async function generateCertificateThumbnail(
 				},
 				(_o: any, object: any) => {
 					// Handle individual object loading errors for thumbnails
-					if (object.type === 'image' && object.src) {
+					if (object.type === "image" && object.src) {
 						// Fallback for WebP images
-						if (object.src.includes('.webp')) {
-							object.src = object.src.replace('.webp', '.png');
+						if (object.src.includes(".webp")) {
+							object.src = object.src.replace(".webp", ".png");
 						}
 					}
 				}
@@ -482,21 +528,21 @@ async function generateCertificateThumbnail(
 		// Export with proper scaling - use PNG to avoid black background issues
 		const imageBase64 = canvas
 			.toDataURL({
-				format: 'png', // Use PNG to preserve transparency and avoid black backgrounds
+				format: "png", // Use PNG to preserve transparency and avoid black backgrounds
 				quality: 1.0, // Maximum quality for PNG
 				multiplier: scaleFactor, // Scale down to thumbnail size
 			})
-			.split(',')[1];
+			.split(",")[1];
 
 		return {
 			imageBase64,
-			status: 'success',
+			status: "success",
 		};
 	} catch (error) {
 		return {
-			imageBase64: '',
-			status: 'error',
-			error: error instanceof Error ? error.message : 'Unknown error',
+			imageBase64: "",
+			status: "error",
+			error: error instanceof Error ? error.message : "Unknown error",
 		};
 	}
 }
@@ -551,9 +597,17 @@ async function processRenderRequest(request: RenderRequest): Promise<RenderResul
 		console.error(
 			`DEBUG: Processing participant ${
 				participant.id
-			}, QR code available: ${!!qrCode}, QR length: ${qrCode?.length || 0}, signatures available: ${!!request.signatures}`
+			}, QR code available: ${!!qrCode}, QR length: ${
+				qrCode?.length || 0
+			}, signatures available: ${!!request.signatures}, watermark available: ${!!request.watermark}`
 		);
-		return generateCertificateImage(request.certificate, participant, qrCode, request.signatures);
+		return generateCertificateImage(
+			request.certificate,
+			participant,
+			qrCode,
+			request.signatures,
+			request.watermark
+		);
 	};
 
 	const results = await processBatch(request.participants, batchSize, processor);
@@ -567,27 +621,27 @@ async function main() {
 	try {
 		// Read JSON from stdin
 		const input = await new Promise<string>((resolve) => {
-			let data = '';
-			process.stdin.on('data', (chunk: any) => {
+			let data = "";
+			process.stdin.on("data", (chunk: any) => {
 				data += chunk.toString();
 			});
-			process.stdin.on('end', () => {
+			process.stdin.on("end", () => {
 				resolve(data);
 			});
 		});
 
 		if (!input.trim()) {
-			throw new Error('No input data received');
+			throw new Error("No input data received");
 		}
 
 		const request: any = JSON.parse(input);
 
 		// Check if this is a thumbnail request
-		if (request.mode === 'thumbnail') {
+		if (request.mode === "thumbnail") {
 			const thumbnailRequest = request as ThumbnailRequest;
 
 			if (!thumbnailRequest.certificate) {
-				throw new Error('Invalid thumbnail request format: missing certificate');
+				throw new Error("Invalid thumbnail request format: missing certificate");
 			}
 
 			// Process thumbnail rendering
@@ -600,7 +654,7 @@ async function main() {
 			const renderRequest = request as RenderRequest;
 
 			if (!renderRequest.certificate || !renderRequest.participants) {
-				throw new Error('Invalid request format: missing certificate or participants');
+				throw new Error("Invalid request format: missing certificate or participants");
 			}
 
 			// Process the rendering
@@ -613,8 +667,8 @@ async function main() {
 		process.exit(0);
 	} catch (error) {
 		const errorResult = {
-			error: error instanceof Error ? error.message : 'Unknown error',
-			status: 'error',
+			error: error instanceof Error ? error.message : "Unknown error",
+			status: "error",
 		};
 
 		console.error(JSON.stringify(errorResult));

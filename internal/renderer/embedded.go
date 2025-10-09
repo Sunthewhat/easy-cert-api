@@ -32,11 +32,15 @@ var rendererScript string
 //go:embed package.json
 var packageJSON string
 
+//go:embed assets/watermark.png
+var watermarkPNG []byte
+
 type RenderRequest struct {
 	Certificate  any               `json:"certificate"`
 	Participants []any             `json:"participants"`
 	QRCodes      map[string]string `json:"qrCodes,omitempty"`
 	Signatures   map[string]string `json:"signatures,omitempty"`
+	Watermark    string            `json:"watermark,omitempty"`
 }
 
 type ThumbnailRequest struct {
@@ -352,12 +356,16 @@ func (r *EmbeddedRenderer) RenderCertificates(ctx context.Context, certificate a
 	// Debug: Log signatures
 	slog.Info("Received signatures for rendering", "certificate_id", certificateID, "signature_count", len(signatures))
 
+	// Encode watermark image to base64
+	watermarkBase64 := base64.StdEncoding.EncodeToString(watermarkPNG)
+
 	// Prepare request
 	request := RenderRequest{
 		Certificate:  certificate,
 		Participants: participants,
 		QRCodes:      qrCodes,
 		Signatures:   signatures,
+		Watermark:    watermarkBase64,
 	}
 
 	requestJSON, err := json.Marshal(request)
