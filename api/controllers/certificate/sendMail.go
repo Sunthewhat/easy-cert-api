@@ -37,10 +37,23 @@ func DistributeByMail(c *fiber.Ctx) error {
 
 	var successResults []map[string]string
 	var failedResults []map[string]string
+	var skippedResults []map[string]string
 
 	for _, participant := range participants {
 		participantInfo := map[string]string{
 			"participant_id": participant.ID,
+		}
+
+		// Skip if email was already sent successfully
+		if participant.EmailStatus == "success" {
+			participantInfo["status"] = "skipped"
+			participantInfo["reason"] = "Email already sent successfully"
+			skippedResults = append(skippedResults, participantInfo)
+			slog.Info("Skipping participant - email already sent",
+				"certId", certId,
+				"participantId", participant.ID,
+				"email_status", participant.EmailStatus)
+			continue
 		}
 
 		if participant.CertificateURL == "" {
@@ -127,8 +140,10 @@ func DistributeByMail(c *fiber.Ctx) error {
 		"total_participants": len(participants),
 		"success_count":      len(successResults),
 		"failed_count":       len(failedResults),
+		"skipped_count":      len(skippedResults),
 		"success_results":    successResults,
 		"failed_results":     failedResults,
+		"skipped_results":    skippedResults,
 	}
 
 	return response.SendSuccess(c, "Mail distribution completed", responseData)
