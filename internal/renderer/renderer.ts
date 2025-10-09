@@ -31,6 +31,7 @@ interface RenderRequest {
 	certificate: CertificateData;
 	participants: ParticipantData[];
 	qrCodes?: { [participantId: string]: string }; // base64 QR codes from Go
+	signatures?: { [signerId: string]: string }; // base64 signature images from Go
 }
 
 interface ThumbnailRequest {
@@ -55,15 +56,17 @@ interface ThumbnailResult {
 function replacePlaceholders(
 	designStr: string,
 	participant: ParticipantData,
-	qrCode?: string
+	qrCode?: string,
+	signatures?: { [signerId: string]: string }
 ): string {
 	try {
 		const design = JSON.parse(designStr);
 
 		if (design.objects && Array.isArray(design.objects)) {
 			console.error(
-				`DEBUG: Processing ${design.objects.length} objects, QR code available: ${!!qrCode}`
+				`DEBUG: Processing ${design.objects.length} objects, QR code available: ${!!qrCode}, signatures available: ${!!signatures}, signature count: ${signatures ? Object.keys(signatures).length : 0}`
 			);
+
 			design.objects = design.objects.map((obj: PlaceholderObject) => {
 				// Log all objects with IDs for debugging
 				if (obj.id) {
@@ -145,6 +148,111 @@ function replacePlaceholders(
 						visible: true,
 						opacity: 1,
 					};
+				}
+
+				// Handle SIGNATURE-{UUID} placeholders - Replace with real signature
+				if (obj.id && obj.id.startsWith('SIGNATURE-') && signatures) {
+					const signerId = obj.id.replace('SIGNATURE-', '');
+					const signatureBase64 = signatures[signerId];
+
+					if (signatureBase64) {
+						console.error(
+							`DEBUG: Found signature placeholder ${obj.id}, replacing with signature image (length: ${signatureBase64.length})`
+						);
+
+						// Get placeholder dimensions and position - matching test.json structure
+						const placeholderLeft = obj.left || 0;
+						const placeholderTop = obj.top || 0;
+						const placeholderWidth = obj.width || 320;
+						const placeholderHeight = obj.height || 180;
+						const placeholderScaleX = obj.scaleX || 1;
+						const placeholderScaleY = obj.scaleY || 1;
+						const placeholderOriginX = obj.originX || 'left';
+						const placeholderOriginY = obj.originY || 'top';
+
+						console.error(
+							`DEBUG: Placeholder - left: ${placeholderLeft}, top: ${placeholderTop}, width: ${placeholderWidth}, height: ${placeholderHeight}, scaleX: ${placeholderScaleX}, scaleY: ${placeholderScaleY}, originX: ${placeholderOriginX}, originY: ${placeholderOriginY}`
+						);
+
+						// Calculate the center point offset for objects within the group
+						// Based on test.json structure where Rect is at -161, -91 (half of 320x180)
+						const centerOffsetX = -(placeholderWidth / 2);
+						const centerOffsetY = -(placeholderHeight / 2);
+
+						// Create signature image matching the structure from test.json
+						const signatureImage = {
+							cropX: 0,
+							cropY: 0,
+							type: 'Image',
+							version: '6.7.1',
+							originX: placeholderOriginX,
+							originY: placeholderOriginY,
+							left: centerOffsetX,  // Offset to center in group
+							top: centerOffsetY,   // Offset to center in group
+							width: placeholderWidth,
+							height: placeholderHeight,
+							fill: 'rgb(0,0,0)',
+							stroke: null,
+							strokeWidth: 0,
+							strokeDashArray: null,
+							strokeLineCap: 'butt',
+							strokeDashOffset: 0,
+							strokeLineJoin: 'miter',
+							strokeUniform: false,
+							strokeMiterLimit: 4,
+							scaleX: 1,
+							scaleY: 1,
+							angle: 0,
+							flipX: false,
+							flipY: false,
+							opacity: 1,
+							shadow: null,
+							visible: true,
+							backgroundColor: '',
+							fillRule: 'nonzero',
+							paintFirst: 'fill',
+							globalCompositeOperation: 'source-over',
+							skewX: 0,
+							skewY: 0,
+							src: `data:image/png;base64,${signatureBase64}`,
+							crossOrigin: 'anonymous',
+							filters: [],
+						};
+
+						// Add watermark text overlay
+						const watermarkText = {
+							type: 'Text',
+							text: 'VERIFIED',
+							version: '6.7.1',
+							originX: 'center',
+							originY: 'center',
+							left: 0,  // Center of group
+							top: 0,   // Center of group
+							fontSize: Math.min(placeholderWidth * 0.15, 24),
+							fontFamily: 'Arial',
+							fontWeight: 'bold',
+							fill: 'rgba(0, 0, 0, 0.3)',
+							stroke: null,
+							strokeWidth: 1,
+							angle: -20,
+							opacity: 0.8,
+							visible: true,
+							textAlign: 'center',
+							backgroundColor: '',
+							paintFirst: 'fill',
+							globalCompositeOperation: 'source-over',
+						};
+
+						console.error(
+							`DEBUG: Signature image created - left: ${centerOffsetX}, top: ${centerOffsetY}, watermark at center (0, 0)`
+						);
+
+						// Return a complete Group matching test.json structure
+						return {
+							...obj,  // Keep all original properties
+							objects: [signatureImage, watermarkText],  // Replace children with signature + watermark
+						};
+					}
 				}
 
 				// Remove standalone dotted rect anchors that are not QR codes
@@ -273,11 +381,12 @@ async function loadCanvasWithImageFallback(designStr: string): Promise<fabric.Ca
 async function generateCertificateImage(
 	certificate: CertificateData,
 	participant: ParticipantData,
-	qrCode?: string
+	qrCode?: string,
+	signatures?: { [signerId: string]: string }
 ): Promise<RenderResult> {
 	try {
 		// Replace placeholders with participant data
-		const processedDesign = replacePlaceholders(certificate.design, participant, qrCode);
+		const processedDesign = replacePlaceholders(certificate.design, participant, qrCode, signatures);
 
 		// Load canvas
 		const canvas = await loadCanvasWithImageFallback(processedDesign);
@@ -442,9 +551,9 @@ async function processRenderRequest(request: RenderRequest): Promise<RenderResul
 		console.error(
 			`DEBUG: Processing participant ${
 				participant.id
-			}, QR code available: ${!!qrCode}, QR length: ${qrCode?.length || 0}`
+			}, QR code available: ${!!qrCode}, QR length: ${qrCode?.length || 0}, signatures available: ${!!request.signatures}`
 		);
-		return generateCertificateImage(request.certificate, participant, qrCode);
+		return generateCertificateImage(request.certificate, participant, qrCode, request.signatures);
 	};
 
 	const results = await processBatch(request.participants, batchSize, processor);

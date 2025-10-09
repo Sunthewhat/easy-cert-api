@@ -149,6 +149,12 @@ func Update(c *fiber.Ctx) error {
 					if createErr != nil {
 						slog.Warn("Certificate Update: Failed to create new signatures", "error", createErr, "cert_id", id)
 					} else {
+						// Mark certificate as unsigned since new signatures were added
+						markErr := certificatemodel.MarkAsUnsigned(id)
+						if markErr != nil {
+							slog.Warn("Certificate Update: Failed to mark certificate as unsigned", "error", markErr, "cert_id", id)
+						}
+
 						// Send signature request emails for newly added signatures
 						emailErr := util.BulkSendSignatureRequests(id, updatedCert.Name, addedSignerIds)
 						if emailErr != nil {
@@ -172,13 +178,25 @@ func Update(c *fiber.Ctx) error {
 					if checkErr != nil {
 						slog.Warn("Certificate Update: Failed to check if all signatures complete", "error", checkErr, "cert_id", id)
 					} else if allComplete {
-						// All remaining signatures are signed, notify certificate owner
+						// All remaining signatures are signed, mark certificate as signed and notify owner
 						slog.Info("Certificate Update: All remaining signatures are complete after removal", "cert_id", id)
+
+						markErr := certificatemodel.MarkAsSigned(id)
+						if markErr != nil {
+							slog.Warn("Certificate Update: Failed to mark certificate as signed", "error", markErr, "cert_id", id)
+						}
+
 						notifyErr := util.SendAllSignaturesCompleteMail(updatedCert.UserID, updatedCert.Name, updatedCert.ID)
 						if notifyErr != nil {
 							slog.Warn("Certificate Update: Failed to send completion notification", "error", notifyErr, "cert_id", id, "owner", updatedCert.UserID)
 						} else {
 							slog.Info("Certificate Update: Owner notified of completion", "cert_id", id, "owner", updatedCert.UserID)
+						}
+					} else {
+						// Not all signatures complete, ensure certificate is marked as unsigned
+						markErr := certificatemodel.MarkAsUnsigned(id)
+						if markErr != nil {
+							slog.Warn("Certificate Update: Failed to mark certificate as unsigned", "error", markErr, "cert_id", id)
 						}
 					}
 				}

@@ -36,6 +36,7 @@ type RenderRequest struct {
 	Certificate  any               `json:"certificate"`
 	Participants []any             `json:"participants"`
 	QRCodes      map[string]string `json:"qrCodes,omitempty"`
+	Signatures   map[string]string `json:"signatures,omitempty"`
 }
 
 type ThumbnailRequest struct {
@@ -332,7 +333,7 @@ func (r *EmbeddedRenderer) GenerateQRCodes(participants []any, certificateID str
 	return qrCodes
 }
 
-func (r *EmbeddedRenderer) RenderCertificates(ctx context.Context, certificate any, participants []any) ([]RenderResult, error) {
+func (r *EmbeddedRenderer) RenderCertificates(ctx context.Context, certificate any, participants []any, signatures map[string]string) ([]RenderResult, error) {
 	// Generate QR codes
 	certMap, ok := certificate.(map[string]any)
 	if !ok {
@@ -348,11 +349,15 @@ func (r *EmbeddedRenderer) RenderCertificates(ctx context.Context, certificate a
 		slog.Info("QR code generated", "participant_id", participantID, "qr_length", len(qrCode))
 	}
 
+	// Debug: Log signatures
+	slog.Info("Received signatures for rendering", "certificate_id", certificateID, "signature_count", len(signatures))
+
 	// Prepare request
 	request := RenderRequest{
 		Certificate:  certificate,
 		Participants: participants,
 		QRCodes:      qrCodes,
+		Signatures:   signatures,
 	}
 
 	requestJSON, err := json.Marshal(request)
@@ -760,7 +765,7 @@ func (r *EmbeddedRenderer) CreateZipArchive(results []CertificateResult) ([]byte
 	return buf.Bytes(), nil
 }
 
-func (r *EmbeddedRenderer) ProcessCertificates(ctx context.Context, certificate any, participants []any) ([]CertificateResult, string, error) {
+func (r *EmbeddedRenderer) ProcessCertificates(ctx context.Context, certificate any, participants []any, signatures map[string]string) ([]CertificateResult, string, error) {
 	// Extract certificate ID
 	certMap, ok := certificate.(map[string]any)
 	if !ok {
@@ -769,7 +774,7 @@ func (r *EmbeddedRenderer) ProcessCertificates(ctx context.Context, certificate 
 	certificateID, _ := certMap["id"].(string)
 
 	// Render certificates
-	renderResults, err := r.RenderCertificates(ctx, certificate, participants)
+	renderResults, err := r.RenderCertificates(ctx, certificate, participants, signatures)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to render certificates: %w", err)
 	}

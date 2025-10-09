@@ -2,6 +2,7 @@ package certificate_controller
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
+	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/internal/renderer"
@@ -63,6 +65,35 @@ func Render(c *fiber.Ctx) error {
 		slog.Error("Certificate Render GetParticipantsByCertId failed", "error", err, "cert_id", certId)
 		return response.SendInternalError(c, err)
 	}
+
+	// Get all signatures for this certificate
+	signatures, sigErr := signaturemodel.GetSignaturesByCertificate(certId)
+	if sigErr != nil {
+		slog.Error("Certificate Render GetSignaturesByCertificate failed", "error", sigErr, "cert_id", certId)
+		return response.SendInternalError(c, sigErr)
+	}
+
+	// Decrypt signature images and create a map of signerId -> base64 image
+	decryptedSignatures := make(map[string]string)
+	for _, sig := range signatures {
+		if sig.IsSigned && sig.Signature != "" {
+			decryptedImage, decryptErr := util.DecryptData(sig.Signature, *common.Config.EncryptionKey)
+			if decryptErr != nil {
+				slog.Warn("Certificate Render: Failed to decrypt signature",
+					"error", decryptErr,
+					"cert_id", certId,
+					"signer_id", sig.SignerID)
+				continue
+			}
+			// Convert to base64 for rendering
+			decryptedSignatures[sig.SignerID] = base64.StdEncoding.EncodeToString(decryptedImage)
+		}
+	}
+
+	slog.Info("Certificate Render: Decrypted signatures",
+		"cert_id", certId,
+		"total_signatures", len(signatures),
+		"decrypted_count", len(decryptedSignatures))
 
 	// Filter participants based on isRenewAll parameter
 	var participants []*participantmodel.CombinedParticipant
@@ -188,8 +219,8 @@ func Render(c *fiber.Ctx) error {
 		// Add other fields as needed
 	}
 
-	// Process certificates with embedded renderer
-	results, zipFilePath, err := embeddedRenderer.ProcessCertificates(ctx, certMap, participantInterfaces)
+	// Process certificates with embedded renderer, passing decrypted signatures
+	results, zipFilePath, err := embeddedRenderer.ProcessCertificates(ctx, certMap, participantInterfaces, decryptedSignatures)
 	if err != nil {
 		slog.Error("Embedded renderer processing failed", "error", err, "cert_id", certId)
 		return response.SendError(c, fmt.Sprintf("Renderer processing failed: %v", err))

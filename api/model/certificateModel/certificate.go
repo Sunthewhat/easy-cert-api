@@ -152,3 +152,25 @@ func MarkAsDistributed(certificateId string) error {
 	}
 	return nil
 }
+
+// MarkAsSigned marks a certificate as fully signed (all signatures complete)
+func MarkAsSigned(certificateId string) error {
+	_, queryErr := common.Gorm.Certificate.Where(common.Gorm.Certificate.ID.Eq(certificateId)).Update(common.Gorm.Certificate.IsSigned, true)
+	if queryErr != nil {
+		slog.Error("Mark certificate as signed Error", "error", queryErr, "certificate_id", certificateId)
+		return queryErr
+	}
+	slog.Info("Certificate marked as signed", "certificate_id", certificateId)
+	return nil
+}
+
+// MarkAsUnsigned marks a certificate as not fully signed (has incomplete signatures)
+func MarkAsUnsigned(certificateId string) error {
+	_, queryErr := common.Gorm.Certificate.Where(common.Gorm.Certificate.ID.Eq(certificateId)).Update(common.Gorm.Certificate.IsSigned, false)
+	if queryErr != nil {
+		slog.Error("Mark certificate as unsigned Error", "error", queryErr, "certificate_id", certificateId)
+		return queryErr
+	}
+	slog.Info("Certificate marked as unsigned", "certificate_id", certificateId)
+	return nil
+}

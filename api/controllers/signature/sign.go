@@ -66,12 +66,19 @@ func Sign(c *fiber.Ctx) error {
 		// Don't fail the request - signature was uploaded successfully
 	}
 
-	// 8. If all signatures are complete, notify certificate owner
+	// 8. If all signatures are complete, mark certificate as signed and notify owner
 	if allComplete {
 		certificate, certErr := certificatemodel.GetById(updatedSignature.CertificateID)
 		if certErr != nil {
 			slog.Error("Failed to get certificate for notification", "error", certErr, "certificateId", updatedSignature.CertificateID)
 		} else if certificate != nil {
+			// Mark certificate as fully signed
+			markErr := certificatemodel.MarkAsSigned(certificate.ID)
+			if markErr != nil {
+				slog.Error("Failed to mark certificate as signed", "error", markErr, "certificateId", certificate.ID)
+				// Don't fail the request - signature was uploaded successfully
+			}
+
 			// Send notification email to certificate owner
 			notifyErr := util.SendAllSignaturesCompleteMail(certificate.UserID, certificate.Name, certificate.ID)
 			if notifyErr != nil {
