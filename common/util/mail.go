@@ -308,3 +308,131 @@ func BulkSendSignatureRequests(certificateId, certificateName string, signerIds 
 
 	return nil
 }
+
+// SendAllSignaturesCompleteMail sends notification to certificate owner when all signatures are complete
+func SendAllSignaturesCompleteMail(ownerEmail, certificateName, certificateId string) error {
+	mailer := gomail.NewMessage()
+	mailer.SetHeader("From", *common.Config.MailUser)
+	mailer.SetHeader("To", ownerEmail)
+	mailer.SetHeader("Subject", fmt.Sprintf("All Signatures Complete - %s", certificateName))
+
+	htmlBody := fmt.Sprintf(`
+		<!DOCTYPE html>
+		<html>
+		<head>
+			<meta charset="UTF-8">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<style>
+				body {
+					font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+					line-height: 1.6;
+					color: #333;
+					margin: 0;
+					padding: 0;
+					background-color: #f5f5f5;
+				}
+				.container {
+					max-width: 600px;
+					margin: 40px auto;
+					background-color: #ffffff;
+					border-radius: 8px;
+					box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+					overflow: hidden;
+				}
+				.header {
+					background: linear-gradient(135deg, #10b981 0%%, #059669 100%%);
+					color: white;
+					padding: 40px 30px;
+					text-align: center;
+				}
+				.header h1 {
+					margin: 0;
+					font-size: 28px;
+					font-weight: 600;
+				}
+				.content {
+					padding: 40px 30px;
+				}
+				.greeting {
+					font-size: 18px;
+					margin-bottom: 20px;
+					color: #111;
+				}
+				.message {
+					font-size: 16px;
+					color: #555;
+					margin-bottom: 30px;
+					line-height: 1.8;
+				}
+				.certificate-info {
+					background-color: #f0fdf4;
+					border-left: 4px solid #10b981;
+					padding: 20px;
+					margin: 25px 0;
+					border-radius: 4px;
+				}
+				.certificate-name {
+					font-size: 18px;
+					font-weight: 600;
+					color: #059669;
+					margin-bottom: 8px;
+				}
+				.certificate-id {
+					font-size: 14px;
+					color: #6b7280;
+					font-family: 'Courier New', monospace;
+				}
+				.success-icon {
+					font-size: 48px;
+					text-align: center;
+					margin: 20px 0;
+				}
+				.footer {
+					background-color: #f9fafb;
+					padding: 30px;
+					text-align: center;
+					font-size: 14px;
+					color: #6b7280;
+					border-top: 1px solid #e5e7eb;
+				}
+			</style>
+		</head>
+		<body>
+			<div class="container">
+				<div class="header">
+					<h1>✅ All Signatures Complete!</h1>
+				</div>
+				<div class="content">
+					<div class="success-icon">🎉</div>
+					<p class="greeting">Great news!</p>
+					<p class="message">
+						All required signatures have been successfully collected for your certificate.
+						The signing process is now complete and your certificate is ready.
+					</p>
+					<div class="certificate-info">
+						<div class="certificate-name">%s</div>
+						<div class="certificate-id">Certificate ID: %s</div>
+					</div>
+					<p class="message">
+						You can now view and distribute the fully signed certificate through your dashboard.
+					</p>
+				</div>
+				<div class="footer">
+					<p>This is an automated notification from the Secure Certificate System.</p>
+					<p>If you have any questions, please contact support.</p>
+				</div>
+			</div>
+		</body>
+		</html>
+	`, certificateName, certificateId)
+
+	mailer.SetBody("text/html", htmlBody)
+
+	if err := common.Dialer.DialAndSend(mailer); err != nil {
+		slog.Error("Failed to send all signatures complete email", "error", err, "recipient", ownerEmail, "certificateId", certificateId)
+		return err
+	}
+
+	slog.Info("All signatures complete email sent successfully", "recipient", ownerEmail, "certificateId", certificateId)
+	return nil
+}

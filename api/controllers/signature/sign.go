@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
+	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
@@ -58,12 +59,37 @@ func Sign(c *fiber.Ctx) error {
 		return response.SendInternalError(c, err)
 	}
 
-	// 7. Return success response
+	// 7. Check if all signatures are complete for this certificate
+	allComplete, checkErr := signaturemodel.AreAllSignaturesComplete(updatedSignature.CertificateID)
+	if checkErr != nil {
+		slog.Error("Failed to check if all signatures complete", "error", checkErr, "certificateId", updatedSignature.CertificateID)
+		// Don't fail the request - signature was uploaded successfully
+	}
+
+	// 8. If all signatures are complete, notify certificate owner
+	if allComplete {
+		certificate, certErr := certificatemodel.GetById(updatedSignature.CertificateID)
+		if certErr != nil {
+			slog.Error("Failed to get certificate for notification", "error", certErr, "certificateId", updatedSignature.CertificateID)
+		} else if certificate != nil {
+			// Send notification email to certificate owner
+			notifyErr := util.SendAllSignaturesCompleteMail(certificate.UserID, certificate.Name, certificate.ID)
+			if notifyErr != nil {
+				slog.Error("Failed to send completion notification email", "error", notifyErr, "certificateId", certificate.ID, "owner", certificate.UserID)
+				// Don't fail the request - signature was uploaded successfully
+			} else {
+				slog.Info("Certificate owner notified of completion", "certificateId", certificate.ID, "owner", certificate.UserID)
+			}
+		}
+	}
+
+	// 9. Return success response
 	return response.SendSuccess(c, "Signature uploaded and encrypted successfully", fiber.Map{
 		"signature_id":   updatedSignature.ID,
 		"signer_id":      updatedSignature.SignerID,
 		"certificate_id": updatedSignature.CertificateID,
 		"is_signed":      updatedSignature.IsSigned,
 		"created_at":     updatedSignature.CreatedAt,
+		"all_complete":   allComplete,
 	})
 }

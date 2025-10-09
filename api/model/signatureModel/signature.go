@@ -214,3 +214,27 @@ func DeleteSignature(certificateId, signerId string) error {
 	return nil
 }
 
+// AreAllSignaturesComplete checks if all signatures for a certificate are signed
+func AreAllSignaturesComplete(certificateId string) (bool, error) {
+	// Get all signatures for the certificate
+	signatures, err := GetSignaturesByCertificate(certificateId)
+	if err != nil {
+		slog.Error("AreAllSignaturesComplete: Error fetching signatures", "error", err, "certificateId", certificateId)
+		return false, err
+	}
+
+	// If no signatures exist, return false
+	if len(signatures) == 0 {
+		return false, nil
+	}
+
+	// Check if all signatures are signed
+	for _, sig := range signatures {
+		if !sig.IsSigned {
+			return false, nil
+		}
+	}
+
+	slog.Info("All signatures complete for certificate", "certificateId", certificateId, "totalSignatures", len(signatures))
+	return true, nil
+}
