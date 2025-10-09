@@ -148,3 +148,91 @@ func DistributeByMail(c *fiber.Ctx) error {
 
 	return response.SendSuccess(c, "Mail distribution completed", responseData)
 }
+
+// ResendParticipantMail resends certificate email to a specific participant by their ID
+func ResendParticipantMail(c *fiber.Ctx) error {
+	participantId := c.Params("participantId")
+
+	if participantId == "" {
+		return response.SendFailed(c, "Participant ID is required")
+	}
+
+	// Get participant by ID
+	participant, err := participantmodel.GetParticipantsById(participantId)
+	if err != nil {
+		slog.Error("Resend Participant Mail: Error getting participant", "error", err, "participantId", participantId)
+		return response.SendInternalError(c, err)
+	}
+
+	if participant == nil {
+		slog.Warn("Resend Participant Mail: Participant not found", "participantId", participantId)
+		return response.SendFailed(c, "Participant not found")
+	}
+
+	// Check if certificate URL exists
+	if participant.CertificateURL == "" {
+		slog.Error("Resend Participant Mail: Certificate URL not found", "participantId", participantId)
+		participantmodel.UpdateEmailStatus(participantId, "failed")
+		return response.SendFailed(c, "Certificate URL not found for this participant")
+	}
+
+	// Extract email from DynamicData using the emailField parameter
+	emailValue, exists := participant.DynamicData["email"]
+	if !exists {
+		slog.Warn("Resend Participant Mail: Email field not found in participant data",
+			"participantId", participantId)
+		participantmodel.UpdateEmailStatus(participantId, "failed")
+		return response.SendFailed(c, "Email field not found in participant data")
+	}
+
+	// Convert to string
+	email, ok := emailValue.(string)
+	if !ok {
+		slog.Warn("Resend Participant Mail: Email field is not a string",
+			"participantId", participantId,
+			"emailValue", emailValue)
+		participantmodel.UpdateEmailStatus(participantId, "failed")
+		return response.SendFailed(c, "Email field is not a valid string")
+	}
+
+	if email == "" {
+		slog.Warn("Resend Participant Mail: Empty email address", "participantId", participantId)
+		participantmodel.UpdateEmailStatus(participantId, "failed")
+		return response.SendFailed(c, "Empty email address")
+	}
+
+	// Send email
+	err = util.SendMail(email, participant.CertificateURL)
+	if err != nil {
+		slog.Error("Resend Participant Mail: Failed to send email",
+			"error", err,
+			"participantId", participantId,
+			"email", email)
+		participantmodel.UpdateEmailStatus(participantId, "failed")
+		return response.SendError(c, "Failed to send email: "+err.Error())
+	}
+
+	// Update email status to success
+	err = participantmodel.UpdateEmailStatus(participantId, "success")
+	if err != nil {
+		slog.Warn("Resend Participant Mail: Failed to update email status",
+			"error", err,
+			"participantId", participantId)
+		// Don't fail the request - email was sent successfully
+	}
+
+	slog.Info("Resend Participant Mail: Email sent successfully",
+		"participantId", participantId,
+		"email", email)
+
+	// Prepare response data
+	responseData := map[string]any{
+		"participant_id":  participant.ID,
+		"email":           email,
+		"email_status":    "success",
+		"certificate_url": participant.CertificateURL,
+		"certificate_id":  participant.CertificateID,
+	}
+
+	return response.SendSuccess(c, "Email sent successfully", responseData)
+}
