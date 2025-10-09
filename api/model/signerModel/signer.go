@@ -54,3 +54,17 @@ func GetById(signerId string) (*model.Signer, error) {
 
 	return signer, nil
 }
+
+func GetByEmail(email string) (*model.Signer, error) {
+	signer, queryErr := common.Gorm.Signer.Where(common.Gorm.Signer.Email.Eq(email)).First()
+
+	if queryErr != nil {
+		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		slog.Error("Get Signer by Email Error", "error", queryErr, "email", email)
+		return nil, queryErr
+	}
+
+	return signer, nil
+}

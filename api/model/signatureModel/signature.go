@@ -28,6 +28,20 @@ func Create(signatureData payload.CreateSignaturePayload, userId string) (*model
 	return signature, nil
 }
 
+func GetById(signatureId string) (*model.Signature, error) {
+	signature, queryErr := common.Gorm.Signature.Where(common.Gorm.Signature.ID.Eq(signatureId)).First()
+
+	if queryErr != nil {
+		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		slog.Error("Get Signature By Id Error", "error", queryErr, "signatureId", signatureId)
+		return nil, queryErr
+	}
+
+	return signature, nil
+}
+
 func GetByCertificateAndSignerId(certificateId string, signerId string) (*model.Signature, error) {
 	signature, queryErr := common.Gorm.Signature.Where(common.Gorm.Signature.CertificateID.Eq(certificateId)).Where(common.Gorm.Signature.SignerID.Eq(signerId)).First()
 
