@@ -51,6 +51,21 @@ func extractSignerIdsFromDesign(designJSON string) ([]string, error) {
 	return result, nil
 }
 
+// stringSliceDifference returns elements in slice 'a' that are not in slice 'b'
+func stringSliceDifference(a, b []string) []string {
+	mb := make(map[string]bool)
+	for _, x := range b {
+		mb[x] = true
+	}
+	var diff []string
+	for _, x := range a {
+		if !mb[x] {
+			diff = append(diff, x)
+		}
+	}
+	return diff
+}
+
 func Update(c *fiber.Ctx) error {
 	// Get certificate ID from URL parameter
 	id := c.Params("id")
@@ -61,10 +76,6 @@ func Update(c *fiber.Ctx) error {
 	autoSaveQuery := c.Query("autosave")
 
 	isAutoSave := autoSaveQuery == "true"
-
-	shareQuery := c.Query("share")
-
-	isShare := shareQuery == "true"
 
 	// Parse request body
 	body := new(payload.UpdateCertificatePayload)
@@ -103,30 +114,62 @@ func Update(c *fiber.Ctx) error {
 		}
 	}
 
-	// If sharing certificate, create signature records for all signature placeholders
-	if isShare {
-		signerIds, extractErr := extractSignerIdsFromDesign(updatedCert.Design)
+	// Synchronize signatures when not autosaving (actual save operation)
+	if !isAutoSave && body.Design != "" {
+		// Extract signer IDs from the updated design
+		newSignerIds, extractErr := extractSignerIdsFromDesign(updatedCert.Design)
 		if extractErr != nil {
-			slog.Warn("Failed to extract signer IDs from certificate design", "error", extractErr, "cert_id", id)
-			// Don't fail the update operation if extraction fails, just log it
-		} else if len(signerIds) > 0 {
-			// Get user ID from context
-			userId, status := middleware.GetUserFromContext(c)
-			if !status {
-				slog.Warn("Failed to get user ID from context when sharing certificate", "cert_id", id)
-				// Don't fail the update operation if user context is missing, just log it
+			slog.Warn("Certificate Update: Failed to extract signer IDs from design", "error", extractErr, "cert_id", id)
+		} else {
+			// Get existing signatures for this certificate
+			existingSignatures, getErr := signaturemodel.GetSignaturesByCertificate(id)
+			if getErr != nil {
+				slog.Warn("Certificate Update: Failed to get existing signatures", "error", getErr, "cert_id", id)
 			} else {
-				bulkCreateErr := signaturemodel.BulkCreateSignatures(id, signerIds, userId)
-				if bulkCreateErr != nil {
-					slog.Warn("Failed to create signatures for certificate", "error", bulkCreateErr, "cert_id", id)
-					// Don't fail the update operation if signature creation fails, just log it
-				} else {
-					// Send signature request emails after successful signature creation
-					emailErr := util.BulkSendSignatureRequests(id, updatedCert.Name, signerIds)
-					if emailErr != nil {
-						slog.Warn("Failed to send signature request emails", "error", emailErr, "cert_id", id)
-						// Don't fail the update operation if email sending fails, just log it
+				// Extract existing signer IDs
+				existingSignerIds := make([]string, len(existingSignatures))
+				for i, sig := range existingSignatures {
+					existingSignerIds[i] = sig.SignerID
+				}
+
+				// Find added and removed signer IDs
+				addedSignerIds := stringSliceDifference(newSignerIds, existingSignerIds)
+				removedSignerIds := stringSliceDifference(existingSignerIds, newSignerIds)
+
+				// Get user ID for creating new signatures
+				userId, userStatus := middleware.GetUserFromContext(c)
+				if !userStatus {
+					slog.Warn("Certificate Update: Failed to get user ID from context", "cert_id", id)
+				}
+
+				// Add new signatures for newly added SIGNATURE objects
+				if len(addedSignerIds) > 0 && userStatus {
+					slog.Info("Certificate Update: Adding new signatures", "cert_id", id, "count", len(addedSignerIds), "signerIds", addedSignerIds)
+					createErr := signaturemodel.BulkCreateSignatures(id, addedSignerIds, userId)
+					if createErr != nil {
+						slog.Warn("Certificate Update: Failed to create new signatures", "error", createErr, "cert_id", id)
+					} else {
+						// Send signature request emails for newly added signatures
+						emailErr := util.BulkSendSignatureRequests(id, updatedCert.Name, addedSignerIds)
+						if emailErr != nil {
+							slog.Warn("Certificate Update: Failed to send signature request emails", "error", emailErr, "cert_id", id)
+						}
 					}
+				}
+
+				// Remove signatures for deleted SIGNATURE objects
+				if len(removedSignerIds) > 0 {
+					slog.Info("Certificate Update: Removing deleted signatures", "cert_id", id, "count", len(removedSignerIds), "signerIds", removedSignerIds)
+					for _, signerId := range removedSignerIds {
+						deleteErr := signaturemodel.DeleteSignature(id, signerId)
+						if deleteErr != nil {
+							slog.Warn("Certificate Update: Failed to delete signature", "error", deleteErr, "cert_id", id, "signerId", signerId)
+						}
+					}
+				}
+
+				if len(addedSignerIds) == 0 && len(removedSignerIds) == 0 {
+					slog.Info("Certificate Update: No signature changes detected", "cert_id", id)
 				}
 			}
 		}

@@ -166,3 +166,37 @@ func GetPendingSignaturesForReminder() ([]*model.Signature, error) {
 	return signatures, nil
 }
 
+// GetSignaturesByCertificate returns all signatures for a specific certificate
+func GetSignaturesByCertificate(certificateId string) ([]*model.Signature, error) {
+	signatures, queryErr := common.Gorm.Signature.Where(
+		common.Gorm.Signature.CertificateID.Eq(certificateId),
+	).Find()
+
+	if queryErr != nil {
+		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
+			return []*model.Signature{}, nil
+		}
+		slog.Error("GetSignaturesByCertificate Error", "error", queryErr, "certificateId", certificateId)
+		return nil, queryErr
+	}
+
+	return signatures, nil
+}
+
+// DeleteSignature deletes a specific signature by certificate ID and signer ID
+func DeleteSignature(certificateId, signerId string) error {
+	result, err := common.Gorm.Signature.Where(
+		common.Gorm.Signature.CertificateID.Eq(certificateId),
+	).Where(
+		common.Gorm.Signature.SignerID.Eq(signerId),
+	).Delete()
+
+	if err != nil {
+		slog.Error("DeleteSignature Error", "error", err, "certificateId", certificateId, "signerId", signerId)
+		return err
+	}
+
+	slog.Info("DeleteSignature successful", "certificateId", certificateId, "signerId", signerId, "rowsAffected", result.RowsAffected)
+	return nil
+}
+
