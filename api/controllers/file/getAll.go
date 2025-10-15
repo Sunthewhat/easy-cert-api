@@ -18,14 +18,27 @@ func GetAllResourceByType(c *fiber.Ctx) error {
 
 	ctx := context.Background()
 
-	fileURLs, err := util.ListFilesByPrefix(ctx, *common.Config.BucketResource, resourceType, 0)
+	// Get direct MinIO URLs first
+	minioURLs, err := util.ListFilesByPrefix(ctx, *common.Config.BucketResource, resourceType, 0)
 	if err != nil {
 		return response.SendInternalError(c, err)
 	}
 
+	// Convert MinIO URLs to backend proxy URLs for security
+	proxyURLs := make([]string, len(minioURLs))
+	for i, minioURL := range minioURLs {
+		proxyURL, err := util.ConvertToProxyURL(minioURL, *common.Config.BucketResource)
+		if err != nil {
+			// If conversion fails, log and use original URL as fallback
+			proxyURLs[i] = minioURL
+		} else {
+			proxyURLs[i] = proxyURL
+		}
+	}
+
 	return response.SendSuccess(c, "Resources retrieved successfully", fiber.Map{
 		"type":  resourceType,
-		"count": len(fileURLs),
-		"files": fileURLs,
+		"count": len(proxyURLs),
+		"files": proxyURLs,
 	})
 }

@@ -93,4 +93,7 @@ func SetupPublicRoutes(router fiber.Router) {
 			"timestamp": fiber.Map{},
 		})
 	})
+
+	// Public certificate download endpoint
+	SetupPublicFileRoutes(publicGroup)
 }

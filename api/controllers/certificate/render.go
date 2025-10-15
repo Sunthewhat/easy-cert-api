@@ -226,19 +226,19 @@ func Render(c *fiber.Ctx) error {
 		return response.SendError(c, fmt.Sprintf("Renderer processing failed: %v", err))
 	}
 
-	// Update certificate archive URL
+	// Update certificate archive URL with proxy URL
 	if zipFilePath != "" {
-		// Use direct path without URL encoding to preserve forward slashes
-		archiveURL := fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, *common.Config.BucketCertificate, zipFilePath)
+		// Use backend proxy URL instead of direct MinIO URL for security
+		archiveURL := util.GenerateProxyURL(*common.Config.BucketCertificate, zipFilePath)
 		certificatemodel.EditArchiveUrl(certId, archiveURL)
 		slog.Info("Updated certificate archive URL", "cert_id", certId, "zip_path", zipFilePath, "url", archiveURL)
 	}
 
-	// Update participant certificate URLs
+	// Update participant certificate URLs with proxy URLs
 	for _, result := range results {
 		if result.Status == "success" && result.FilePath != "" {
-			// Use direct path without URL encoding to preserve forward slashes
-			certificateURL := fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, *common.Config.BucketCertificate, result.FilePath)
+			// Use backend proxy URL instead of direct MinIO URL for security
+			certificateURL := util.GenerateProxyURL(*common.Config.BucketCertificate, result.FilePath)
 			err := participantmodel.UpdateParticipantCertificateUrlInPostgres(result.ParticipantID, certificateURL)
 			if err != nil {
 				slog.Warn("Certificate Render failed to update participant certificate URL",

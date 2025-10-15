@@ -615,10 +615,10 @@ func (r *EmbeddedRenderer) ensureBucketPublic(bucketName string) error {
 	return nil
 }
 
-// GenerateAccessibleURL creates a static URL for accessing MinIO objects
+// GenerateAccessibleURL creates a backend proxy URL for accessing MinIO objects
 func (r *EmbeddedRenderer) GenerateAccessibleURL(bucketName, objectName string) string {
-	// Return static URL - objects should be publicly accessible
-	return fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, bucketName, objectName)
+	// Return backend proxy URL instead of direct MinIO URL for security
+	return fmt.Sprintf("%s/api/public/files/download/%s/%s", *common.Config.BackendURL, bucketName, objectName)
 }
 
 func (r *EmbeddedRenderer) ConvertToPDF(imageBase64 string, participantID string, certificateID string) ([]byte, error) {

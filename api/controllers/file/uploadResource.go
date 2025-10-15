@@ -42,10 +42,17 @@ func UploadResource(c *fiber.Ctx) error {
 		return response.SendInternalError(c, err)
 	}
 
+	// Convert MinIO URL to backend proxy URL for security
+	proxyURL, err := util.ConvertToProxyURL(fileURL, *common.Config.BucketResource)
+	if err != nil {
+		// If conversion fails, use original URL as fallback
+		proxyURL = fileURL
+	}
+
 	return response.SendSuccess(c, "Resource Upload Successfully", fiber.Map{
 		"filename":    file.Filename,
 		"object_name": objName,
-		"url":         fileURL,
+		"url":         proxyURL,
 		"size":        file.Size,
 	})
 }

@@ -192,3 +192,8 @@ func ResetParticipantStatuses(participantIds []string) error {
 	slog.Info("ParticipantModel ResetParticipantStatuses success", "count", len(participantIds))
 	return nil
 }
+
+// MarkAsDownloaded marks a participant as downloaded
+func MarkAsDownloaded(participantId string) error {
+	return UpdateDownloadStatus(participantId, true)
+}

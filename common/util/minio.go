@@ -3,7 +3,6 @@ package util
 import (
 	"context"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"strings"
 
@@ -74,7 +73,7 @@ func UploadFile(ctx context.Context, bucketName string, objectName string, file 
 	return url, nil
 }
 
-func DownloadFile(ctx context.Context, bucketName string, objectName string) (io.ReadCloser, error) {
+func DownloadFile(ctx context.Context, bucketName string, objectName string) (*minio.Object, error) {
 	if minioClient == nil {
 		return nil, fmt.Errorf("MinIO client not initialized")
 	}
@@ -165,4 +164,24 @@ func DeleteFileByURL(ctx context.Context, bucketName string, fileURL string) err
 	}
 
 	return DeleteFile(ctx, bucketName, objectName)
+}
+
+// ConvertToProxyURL converts a direct MinIO URL to a backend proxy URL
+// Example: https://minio.example.com/bucket/path/file.pdf -> http://localhost:8000/api/public/files/download/bucket/path/file.pdf
+func ConvertToProxyURL(minioURL string, bucketName string) (string, error) {
+	if minioURL == "" {
+		return "", nil
+	}
+
+	objectName, err := ExtractObjectNameFromURL(minioURL, bucketName)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract object name from URL: %w", err)
+	}
+
+	return fmt.Sprintf("%s/api/public/files/download/%s/%s", *common.Config.BackendURL, bucketName, objectName), nil
+}
+
+// GenerateProxyURL generates a backend proxy URL for a given bucket and object path
+func GenerateProxyURL(bucketName string, objectPath string) string {
+	return fmt.Sprintf("%s/api/public/files/download/%s/%s", *common.Config.BackendURL, bucketName, objectPath)
 }
