@@ -75,4 +75,4 @@ WORKDIR /root/
 EXPOSE 8000
 
 # Run the binary
-ENTRYPOINT ["./main"]
+ENTRYPOINT ["./main", "--Prod"]

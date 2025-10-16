@@ -15,6 +15,7 @@ func main() {
 	isPushDB := flag.Bool("PushDB", false, "Run database migration")
 	isPullDB := flag.Bool("PullDB", false, "Run database pulling")
 	isRunAfter := flag.Bool("Run", false, "Run after db process")
+	isProd := flag.Bool("Prod", false, "Run a production")
 	flag.Parse()
 	config.LoadConfig()
 	if *isPushDB || *isPullDB {
@@ -27,6 +28,10 @@ func main() {
 		if !*isRunAfter {
 			return
 		}
+	}
+
+	if *isProd {
+		gorm.Push_db()
 	}
 
 	gorm.InitGorm()
