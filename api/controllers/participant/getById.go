@@ -27,7 +27,7 @@ func GetValidationDataByParticipantId(c *fiber.Ctx) error {
 		return response.SendInternalError(c, err)
 	}
 
-	if !participant.IsDownloaded || participant.EmailStatus != "success" {
+	if !participant.IsDownloaded && participant.EmailStatus != "success" {
 		return response.SendFailed(c, "Participant not found")
 	}
 
