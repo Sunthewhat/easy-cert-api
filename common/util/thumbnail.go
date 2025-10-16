@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
@@ -26,6 +27,14 @@ func RenderCertificateThumbnail(certificate *model.Certificate) error {
 	// Create context with timeout (30 seconds for thumbnail)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
+	if *common.Config.Environment {
+		certificate.Design = strings.ReplaceAll(
+			certificate.Design,
+			"http://easycert.sit.kmutt.ac.th",
+			"http://backend:8000",
+		)
+	}
 
 	// Convert certificate struct to map for renderer compatibility
 	certMap := map[string]any{

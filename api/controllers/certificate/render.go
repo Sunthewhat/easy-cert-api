@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -209,6 +210,14 @@ func Render(c *fiber.Ctx) error {
 	participantInterfaces := make([]any, len(participants))
 	for i, p := range participants {
 		participantInterfaces[i] = p
+	}
+
+	if *common.Config.Environment {
+		cert.Design = strings.ReplaceAll(
+			cert.Design,
+			"http://easycert.sit.kmutt.ac.th",
+			"http://backend:8000",
+		)
 	}
 
 	// Convert certificate struct to map for renderer compatibility
