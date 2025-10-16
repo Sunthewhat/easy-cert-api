@@ -31,6 +31,7 @@ func main() {
 	}
 
 	if *isProd {
+		slog.Info("Pusing database to PostgreSQL")
 		gorm.Push_db()
 	}
 
