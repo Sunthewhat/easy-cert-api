@@ -214,6 +214,35 @@ func DeleteSignature(certificateId, signerId string) error {
 	return nil
 }
 
+// DeleteSignaturesByCertificate deletes all signatures for a specific certificate
+func DeleteSignaturesByCertificate(certificateId string) ([]*model.Signature, error) {
+	// First, get all signatures for this certificate so we can return them
+	signatures, queryErr := common.Gorm.Signature.Where(
+		common.Gorm.Signature.CertificateID.Eq(certificateId),
+	).Find()
+
+	if queryErr != nil {
+		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
+			return []*model.Signature{}, nil
+		}
+		slog.Error("DeleteSignaturesByCertificate: Error fetching signatures", "error", queryErr, "certificateId", certificateId)
+		return nil, queryErr
+	}
+
+	// Delete all signatures for this certificate
+	result, err := common.Gorm.Signature.Where(
+		common.Gorm.Signature.CertificateID.Eq(certificateId),
+	).Delete()
+
+	if err != nil {
+		slog.Error("DeleteSignaturesByCertificate Error", "error", err, "certificateId", certificateId)
+		return nil, err
+	}
+
+	slog.Info("DeleteSignaturesByCertificate successful", "certificateId", certificateId, "deletedCount", result.RowsAffected)
+	return signatures, nil
+}
+
 // AreAllSignaturesComplete checks if all signatures for a certificate are signed
 func AreAllSignaturesComplete(certificateId string) (bool, error) {
 	// Get all signatures for the certificate
