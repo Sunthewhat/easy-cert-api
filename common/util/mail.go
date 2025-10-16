@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,6 +68,13 @@ func SendMail(participantMail string, certificateUrl string) error {
 }
 
 func downloadCertificate(url string, filename string) error {
+	if *common.Config.Environment {
+		url = strings.ReplaceAll(
+			url,
+			"http://easycert.sit.kmutt.ac.th",
+			"http://backend:8000",
+		)
+	}
 	slog.Info("Downloading certificate", "url", url, "filename", filename)
 
 	resp, err := http.Get(url)
