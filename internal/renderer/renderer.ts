@@ -10,6 +10,94 @@ declare const Bun: {
 
 import { fabric } from "fabric";
 
+// Verbose logging utilities
+const VERBOSE_DEFAULT = "1"; // Always verbose unless explicitly disabled
+function nowISO(): string {
+	try {
+		return new Date().toISOString();
+	} catch {
+		return "";
+	}
+}
+function getMemSafe(): Record<string, any> | undefined {
+	try {
+		// Bun may expose Node-like memoryUsage
+		// @ts-ignore
+		const mu =
+			process && typeof process.memoryUsage === "function"
+				? process.memoryUsage()
+				: undefined;
+		if (!mu) return undefined;
+		return {
+			rss: mu.rss,
+			heapTotal: mu.heapTotal,
+			heapUsed: mu.heapUsed,
+			external: (mu as any).external,
+		};
+	} catch {
+		return undefined;
+	}
+}
+function vLog(message: string, context?: Record<string, any>) {
+	try {
+		// @ts-ignore
+		const enabled = (process?.env?.RENDERER_VERBOSE ?? VERBOSE_DEFAULT) !== "0";
+		if (!enabled) return;
+		const payload: any = { ts: nowISO(), msg: message };
+		if (context && Object.keys(context).length) payload.ctx = context;
+		const mem = getMemSafe();
+		if (mem) payload.mem = mem;
+		console.error(`VERBOSE ${JSON.stringify(payload)}`);
+	} catch (e) {
+		// As a last resort, fail-safe log
+		try {
+			console.error(`VERBOSE_FALLBACK ${message}`);
+		} catch {}
+	}
+}
+function formatError(err: unknown): { message: string; stack?: string; name?: string } {
+	if (err instanceof Error) return { message: err.message, stack: err.stack, name: err.name };
+	try {
+		return { message: JSON.stringify(err) };
+	} catch {
+		return { message: String(err) };
+	}
+}
+function withTiming<T>(label: string, fn: () => T): T {
+	const start = Date.now();
+	try {
+		vLog(`${label}:start`);
+		const out = fn();
+		vLog(`${label}:success`, { durationMs: Date.now() - start });
+		return out;
+	} catch (e) {
+		const fe = formatError(e);
+		vLog(`${label}:error`, { ...fe, durationMs: Date.now() - start });
+		throw e;
+	}
+}
+async function withTimingAsync<T>(label: string, fn: () => Promise<T>): Promise<T> {
+	const start = Date.now();
+	try {
+		vLog(`${label}:start`);
+		const out = await fn();
+		vLog(`${label}:success`, { durationMs: Date.now() - start });
+		return out;
+	} catch (e) {
+		const fe = formatError(e);
+		vLog(`${label}:error`, { ...fe, durationMs: Date.now() - start });
+		throw e;
+	}
+}
+
+// Promise helpers to narrow settled results
+function isFulfilled<T>(r: PromiseSettledResult<T>): r is PromiseFulfilledResult<T> {
+	return r.status === "fulfilled";
+}
+function isRejected<T>(r: PromiseSettledResult<T>): r is PromiseRejectedResult {
+	return r.status === "rejected";
+}
+
 interface PlaceholderObject {
 	id: string;
 	text?: string;
@@ -62,261 +150,301 @@ function replacePlaceholders(
 	watermark?: string
 ): string {
 	try {
-		const design = JSON.parse(designStr);
+		vLog("replacePlaceholders:input", {
+			participantId: participant?.id,
+			hasQRCode: !!qrCode,
+			qrLen: qrCode?.length || 0,
+			signatureCount: signatures ? Object.keys(signatures).length : 0,
+			hasWatermark: !!watermark,
+			designStrLen: designStr?.length || 0,
+		});
+		const design = withTiming("replacePlaceholders:parseDesign", () => JSON.parse(designStr));
 
 		if (design.objects && Array.isArray(design.objects)) {
-			console.error(
-				`DEBUG: Processing ${
-					design.objects.length
-				} objects, QR code available: ${!!qrCode}, signatures available: ${!!signatures}, signature count: ${
-					signatures ? Object.keys(signatures).length : 0
-				}`
-			);
+			vLog("replacePlaceholders:objects:begin", {
+				objectCount: design.objects.length,
+				hasQRCode: !!qrCode,
+				hasSignatures: !!signatures,
+				signatureCount: signatures ? Object.keys(signatures).length : 0,
+			});
 
-			design.objects = design.objects.map((obj: PlaceholderObject) => {
-				// Log all objects with IDs for debugging
-				if (obj.id) {
-					console.error(`DEBUG: Processing object ID: ${obj.id}, type: ${obj.type}`);
-				}
-				// Handle grouped anchors (text anchors that are groups) - check for Group type (capital G)
-				if (
-					obj.isAnchor &&
-					obj.id &&
-					(obj.type === "Group" || obj.type === "group") &&
-					obj.id.startsWith("PLACEHOLDER-")
-				) {
-					const fieldName = obj.id.replace("PLACEHOLDER-", "");
-					// Check both participant.fieldName and participant.data.fieldName
-					const fieldValue =
-						participant[fieldName] || (participant.data && participant.data[fieldName]);
+			design.objects = design.objects.map((obj: PlaceholderObject, idx: number) => {
+				try {
+					// Log all objects with IDs for debugging
+					if (obj.id) {
+						vLog("replacePlaceholders:object", { idx, id: obj.id, type: obj.type });
+					}
+					// Handle grouped anchors (text anchors that are groups) - check for Group type (capital G)
+					if (
+						obj.isAnchor &&
+						obj.id &&
+						(obj.type === "Group" || obj.type === "group") &&
+						obj.id.startsWith("PLACEHOLDER-")
+					) {
+						const fieldName = obj.id.replace("PLACEHOLDER-", "");
+						// Check both participant.fieldName and participant.data.fieldName
+						const fieldValue =
+							participant[fieldName] ||
+							(participant.data && participant.data[fieldName]);
 
-					if (fieldValue && obj.objects && Array.isArray(obj.objects)) {
-						// Remove Rect objects from the group (dotted borders) and keep only textbox
-						const filteredObjects = obj.objects.filter(
-							(subObj: any) => subObj.type !== "Rect" && subObj.type !== "rect"
-						);
+						if (fieldValue && obj.objects && Array.isArray(obj.objects)) {
+							// Remove Rect objects from the group (dotted borders) and keep only textbox
+							const filteredObjects = obj.objects.filter(
+								(subObj: any) => subObj.type !== "Rect" && subObj.type !== "rect"
+							);
 
-						// Find and update the textbox within the group
-						const updatedObjects = filteredObjects.map((subObj: any) => {
-							if (subObj.type === "Textbox" || subObj.type === "textbox") {
-								return { ...subObj, text: fieldValue };
-							}
-							return subObj;
+							// Find and update the textbox within the group
+							const updatedObjects = filteredObjects.map((subObj: any) => {
+								if (subObj.type === "Textbox" || subObj.type === "textbox") {
+									return { ...subObj, text: fieldValue };
+								}
+								return subObj;
+							});
+
+							return { ...obj, objects: updatedObjects };
+						}
+					}
+
+					// Handle individual textbox anchors - check for both Textbox and textbox
+					else if (
+						obj.isAnchor &&
+						obj.id &&
+						(obj.type === "Textbox" || obj.type === "textbox") &&
+						obj.id.startsWith("PLACEHOLDER-")
+					) {
+						const fieldName = obj.id.replace("PLACEHOLDER-", "");
+						// Check both participant.fieldName and participant.data.fieldName
+						const fieldValue =
+							participant[fieldName] ||
+							(participant.data && participant.data[fieldName]);
+
+						if (fieldValue) {
+							return { ...obj, text: fieldValue };
+						}
+					}
+
+					// Handle simple ID-based placeholders (backward compatibility)
+					else if (obj.id && obj.id.startsWith("PLACEHOLDER-")) {
+						const fieldName = obj.id.replace("PLACEHOLDER-", "");
+						// Check both participant.fieldName and participant.data.fieldName
+						const fieldValue =
+							participant[fieldName] ||
+							(participant.data && participant.data[fieldName]);
+						if (fieldValue) {
+							return { ...obj, text: fieldValue };
+						}
+					}
+
+					// Replace QR anchor with QR code if provided - check for qr-anchor anywhere in ID
+					if (obj.id && obj.id.includes("qr-anchor") && qrCode) {
+						vLog("replacePlaceholders:qr:replace", {
+							id: obj.id,
+							qrLen: qrCode.length,
 						});
-
-						return { ...obj, objects: updatedObjects };
-					}
-				}
-
-				// Handle individual textbox anchors - check for both Textbox and textbox
-				else if (
-					obj.isAnchor &&
-					obj.id &&
-					(obj.type === "Textbox" || obj.type === "textbox") &&
-					obj.id.startsWith("PLACEHOLDER-")
-				) {
-					const fieldName = obj.id.replace("PLACEHOLDER-", "");
-					// Check both participant.fieldName and participant.data.fieldName
-					const fieldValue =
-						participant[fieldName] || (participant.data && participant.data[fieldName]);
-
-					if (fieldValue) {
-						return { ...obj, text: fieldValue };
-					}
-				}
-
-				// Handle simple ID-based placeholders (backward compatibility)
-				else if (obj.id && obj.id.startsWith("PLACEHOLDER-")) {
-					const fieldName = obj.id.replace("PLACEHOLDER-", "");
-					// Check both participant.fieldName and participant.data.fieldName
-					const fieldValue =
-						participant[fieldName] || (participant.data && participant.data[fieldName]);
-					if (fieldValue) {
-						return { ...obj, text: fieldValue };
-					}
-				}
-
-				// Replace QR anchor with QR code if provided - check for qr-anchor anywhere in ID
-				if (obj.id && obj.id.includes("qr-anchor") && qrCode) {
-					console.error(
-						`DEBUG: Found QR anchor ${obj.id}, replacing with QR code (length: ${qrCode.length})`
-					);
-					return {
-						...obj,
-						type: "Image",
-						src: `data:image/png;base64,${qrCode}`,
-						crossOrigin: "anonymous",
-						// Remove dotted border styling
-						stroke: null,
-						strokeDashArray: null,
-						fill: null,
-						// Make it visible and properly sized
-						visible: true,
-						opacity: 1,
-					};
-				}
-
-				// Handle SIGNATURE-{UUID} placeholders - Replace with real signature
-				if (obj.id && obj.id.startsWith("SIGNATURE-") && signatures) {
-					const signerId = obj.id.replace("SIGNATURE-", "");
-					const signatureBase64 = signatures[signerId];
-
-					if (signatureBase64) {
-						console.error(
-							`DEBUG: Found signature placeholder ${obj.id}, replacing with signature image (length: ${signatureBase64.length})`
-						);
-
-						// Get placeholder dimensions and position - matching test.json structure
-						const placeholderLeft = obj.left || 0;
-						const placeholderTop = obj.top || 0;
-						const placeholderWidth = obj.width || 320;
-						const placeholderHeight = obj.height || 180;
-						const placeholderScaleX = obj.scaleX || 1;
-						const placeholderScaleY = obj.scaleY || 1;
-						const placeholderOriginX = obj.originX || "left";
-						const placeholderOriginY = obj.originY || "top";
-
-						console.error(
-							`DEBUG: Placeholder - left: ${placeholderLeft}, top: ${placeholderTop}, width: ${placeholderWidth}, height: ${placeholderHeight}, scaleX: ${placeholderScaleX}, scaleY: ${placeholderScaleY}, originX: ${placeholderOriginX}, originY: ${placeholderOriginY}`
-						);
-
-						// Calculate the center point offset for objects within the group
-						// Based on test.json structure where Rect is at -161, -91 (half of 320x180)
-						const centerOffsetX = -(placeholderWidth / 2);
-						const centerOffsetY = -(placeholderHeight / 2);
-
-						// Signature image from frontend is always 800x450 (16:9 landscape)
-						const SIGNATURE_NATIVE_WIDTH = 800;
-						const SIGNATURE_NATIVE_HEIGHT = 450;
-
-						// Calculate scale factor to fit signature into placeholder
-						// Since both are 16:9, we can use either dimension
-						const imageScale = placeholderWidth / SIGNATURE_NATIVE_WIDTH;
-
-						console.error(
-							`DEBUG: Signature scaling - native: ${SIGNATURE_NATIVE_WIDTH}x${SIGNATURE_NATIVE_HEIGHT}, placeholder: ${placeholderWidth}x${placeholderHeight}, scale: ${imageScale}`
-						);
-
-						// Create signature image matching the structure from test.json
-						const signatureImage = {
-							cropX: 0,
-							cropY: 0,
+						return {
+							...obj,
 							type: "Image",
-							version: "6.7.1",
-							originX: placeholderOriginX,
-							originY: placeholderOriginY,
-							left: centerOffsetX, // Offset to center in group
-							top: centerOffsetY, // Offset to center in group
-							width: SIGNATURE_NATIVE_WIDTH, // Use native dimensions
-							height: SIGNATURE_NATIVE_HEIGHT, // Use native dimensions
-							fill: "rgb(0,0,0)",
-							stroke: null,
-							strokeWidth: 0,
-							strokeDashArray: null,
-							strokeLineCap: "butt",
-							strokeDashOffset: 0,
-							strokeLineJoin: "miter",
-							strokeUniform: false,
-							strokeMiterLimit: 4,
-							scaleX: imageScale, // Scale to fit placeholder
-							scaleY: imageScale, // Scale to fit placeholder
-							angle: 0,
-							flipX: false,
-							flipY: false,
-							opacity: 1,
-							shadow: null,
-							visible: true,
-							backgroundColor: "",
-							fillRule: "nonzero",
-							paintFirst: "fill",
-							globalCompositeOperation: "source-over",
-							skewX: 0,
-							skewY: 0,
-							src: `data:image/png;base64,${signatureBase64}`,
+							src: `data:image/png;base64,${qrCode}`,
 							crossOrigin: "anonymous",
-							filters: [],
+							// Remove dotted border styling
+							stroke: null,
+							strokeDashArray: null,
+							fill: null,
+							// Make it visible and properly sized
+							visible: true,
+							opacity: 1,
 						};
+					}
 
-						// Add watermark image overlay (if watermark is provided)
-						const children: any[] = [signatureImage];
+					// Handle SIGNATURE-{UUID} placeholders - Replace with real signature
+					if (obj.id && obj.id.startsWith("SIGNATURE-") && signatures) {
+						const signerId = obj.id.replace("SIGNATURE-", "");
+						const signatureBase64 = signatures[signerId];
 
-						if (watermark) {
-							// Calculate watermark size - smaller scale
-							const watermarkWidth = placeholderWidth * 0.45;
-							const watermarkScale = watermarkWidth / 512; // Scale from native 512px width
+						if (signatureBase64) {
+							vLog("replacePlaceholders:signature:replace", {
+								id: obj.id,
+								signerId,
+								sigLen: signatureBase64.length,
+							});
 
-							const watermarkImage = {
+							// Get placeholder dimensions and position - matching test.json structure
+							const placeholderLeft = obj.left || 0;
+							const placeholderTop = obj.top || 0;
+							const placeholderWidth = obj.width || 320;
+							const placeholderHeight = obj.height || 180;
+							const placeholderScaleX = obj.scaleX || 1;
+							const placeholderScaleY = obj.scaleY || 1;
+							const placeholderOriginX = obj.originX || "left";
+							const placeholderOriginY = obj.originY || "top";
+
+							vLog("replacePlaceholders:signature:placeholder", {
+								left: placeholderLeft,
+								top: placeholderTop,
+								width: placeholderWidth,
+								height: placeholderHeight,
+								scaleX: placeholderScaleX,
+								scaleY: placeholderScaleY,
+								originX: placeholderOriginX,
+								originY: placeholderOriginY,
+							});
+
+							// Calculate the center point offset for objects within the group
+							// Based on test.json structure where Rect is at -161, -91 (half of 320x180)
+							const centerOffsetX = -(placeholderWidth / 2);
+							const centerOffsetY = -(placeholderHeight / 2);
+
+							// Signature image from frontend is always 800x450 (16:9 landscape)
+							const SIGNATURE_NATIVE_WIDTH = 800;
+							const SIGNATURE_NATIVE_HEIGHT = 450;
+
+							// Calculate scale factor to fit signature into placeholder
+							// Since both are 16:9, we can use either dimension
+							const imageScale = placeholderWidth / SIGNATURE_NATIVE_WIDTH;
+
+							vLog("replacePlaceholders:signature:scale", {
+								nativeW: SIGNATURE_NATIVE_WIDTH,
+								nativeH: SIGNATURE_NATIVE_HEIGHT,
+								placeholderW: placeholderWidth,
+								placeholderH: placeholderHeight,
+								scale: imageScale,
+							});
+
+							// Create signature image matching the structure from test.json
+							const signatureImage = {
 								cropX: 0,
 								cropY: 0,
 								type: "Image",
 								version: "6.7.1",
-								originX: "center",
-								originY: "center",
-								left: 0, // Center of group
-								top: 0, // Center of group
-								width: 756, // Native width
-								height: 193, // Native height
-								scaleX: watermarkScale,
-								scaleY: watermarkScale,
-								angle: 0, // No tilt - straight watermark
-								opacity: 0.3,
-								visible: true,
+								originX: placeholderOriginX,
+								originY: placeholderOriginY,
+								left: centerOffsetX, // Offset to center in group
+								top: centerOffsetY, // Offset to center in group
+								width: SIGNATURE_NATIVE_WIDTH, // Use native dimensions
+								height: SIGNATURE_NATIVE_HEIGHT, // Use native dimensions
 								fill: "rgb(0,0,0)",
 								stroke: null,
 								strokeWidth: 0,
+								strokeDashArray: null,
+								strokeLineCap: "butt",
+								strokeDashOffset: 0,
+								strokeLineJoin: "miter",
+								strokeUniform: false,
+								strokeMiterLimit: 4,
+								scaleX: imageScale, // Scale to fit placeholder
+								scaleY: imageScale, // Scale to fit placeholder
+								angle: 0,
+								flipX: false,
+								flipY: false,
+								opacity: 1,
+								shadow: null,
+								visible: true,
 								backgroundColor: "",
 								fillRule: "nonzero",
 								paintFirst: "fill",
 								globalCompositeOperation: "source-over",
 								skewX: 0,
 								skewY: 0,
-								src: `data:image/png;base64,${watermark}`,
+								src: `data:image/png;base64,${signatureBase64}`,
 								crossOrigin: "anonymous",
 								filters: [],
 							};
 
-							children.push(watermarkImage);
+							// Add watermark image overlay (if watermark is provided)
+							const children: any[] = [signatureImage];
 
-							console.error(
-								`DEBUG: Watermark image added - width: ${watermarkWidth}, scale: ${watermarkScale}, opacity: 0.3`
-							);
+							if (watermark) {
+								// Calculate watermark size - smaller scale
+								const watermarkWidth = placeholderWidth * 0.45;
+								const watermarkScale = watermarkWidth / 512; // Scale from native 512px width
+
+								const watermarkImage = {
+									cropX: 0,
+									cropY: 0,
+									type: "Image",
+									version: "6.7.1",
+									originX: "center",
+									originY: "center",
+									left: 0, // Center of group
+									top: 0, // Center of group
+									width: 756, // Native width
+									height: 193, // Native height
+									scaleX: watermarkScale,
+									scaleY: watermarkScale,
+									angle: 0, // No tilt - straight watermark
+									opacity: 0.3,
+									visible: true,
+									fill: "rgb(0,0,0)",
+									stroke: null,
+									strokeWidth: 0,
+									backgroundColor: "",
+									fillRule: "nonzero",
+									paintFirst: "fill",
+									globalCompositeOperation: "source-over",
+									skewX: 0,
+									skewY: 0,
+									src: `data:image/png;base64,${watermark}`,
+									crossOrigin: "anonymous",
+									filters: [],
+								};
+
+								children.push(watermarkImage);
+								vLog("replacePlaceholders:watermark:added", {
+									width: watermarkWidth,
+									scale: watermarkScale,
+									opacity: 0.3,
+								});
+							}
+
+							vLog("replacePlaceholders:signature:created", {
+								left: centerOffsetX,
+								top: centerOffsetY,
+								children: children.length,
+							});
+
+							// Return a complete Group matching test.json structure
+							return {
+								...obj, // Keep all original properties
+								objects: children, // Replace children with signature + optional watermark
+							};
 						}
-
-						console.error(
-							`DEBUG: Signature image created - left: ${centerOffsetX}, top: ${centerOffsetY}, children count: ${children.length}`
-						);
-
-						// Return a complete Group matching test.json structure
-						return {
-							...obj, // Keep all original properties
-							objects: children, // Replace children with signature + optional watermark
-						};
 					}
-				}
 
-				// Remove standalone dotted rect anchors that are not QR codes
-				if (
-					obj.id &&
-					obj.id.includes("anchor") &&
-					(obj.type === "Rect" || obj.type === "rect") &&
-					obj.strokeDashArray &&
-					Array.isArray(obj.strokeDashArray) &&
-					!obj.id.includes("qr-anchor")
-				) {
-					// This is likely a dotted border anchor - hide it in final render
-					return { ...obj, visible: false };
-				}
+					// Remove standalone dotted rect anchors that are not QR codes
+					if (
+						obj.id &&
+						obj.id.includes("anchor") &&
+						(obj.type === "Rect" || obj.type === "rect") &&
+						obj.strokeDashArray &&
+						Array.isArray(obj.strokeDashArray) &&
+						!obj.id.includes("qr-anchor")
+					) {
+						// This is likely a dotted border anchor - hide it in final render
+						return { ...obj, visible: false };
+					}
 
-				return obj;
+					return obj;
+				} catch (e) {
+					const fe = formatError(e);
+					vLog("replacePlaceholders:object:error", { idx, id: (obj as any)?.id, ...fe });
+					return obj; // fail-safe, keep original
+				}
 			});
 
 			// Filter out invisible objects to clean up the design
-			design.objects = design.objects.filter((obj: any) => obj.visible !== false);
+			try {
+				design.objects = design.objects.filter((obj: any) => obj.visible !== false);
+			} catch (e) {
+				vLog("replacePlaceholders:filterInvisible:error", formatError(e));
+			}
+			vLog("replacePlaceholders:objects:end", { remaining: design.objects?.length || 0 });
 		}
 
-		return JSON.stringify(design);
+		return withTiming("replacePlaceholders:stringify", () => JSON.stringify(design));
 	} catch (error) {
-		throw new Error(`Failed to replace placeholders: ${error}`);
+		const fe = formatError(error);
+		vLog("replacePlaceholders:fatal", fe);
+		throw new Error(`Failed to replace placeholders: ${fe.message}`);
 	}
 }
 
@@ -327,30 +455,35 @@ function cleanDesignForThumbnail(design: any): any {
 	}
 
 	const cleanedObjects = design.objects.map((obj: any) => {
-		// Handle grouped anchors - remove Rect objects from groups
-		if (
-			(obj.type === "Group" || obj.type === "group") &&
-			obj.objects &&
-			Array.isArray(obj.objects)
-		) {
-			const filteredObjects = obj.objects.filter(
-				(subObj: any) => subObj.type !== "Rect" && subObj.type !== "rect"
-			);
-			return { ...obj, objects: filteredObjects };
-		}
+		try {
+			// Handle grouped anchors - remove Rect objects from groups
+			if (
+				(obj.type === "Group" || obj.type === "group") &&
+				obj.objects &&
+				Array.isArray(obj.objects)
+			) {
+				const filteredObjects = obj.objects.filter(
+					(subObj: any) => subObj.type !== "Rect" && subObj.type !== "rect"
+				);
+				return { ...obj, objects: filteredObjects };
+			}
 
-		// Hide standalone dotted rect anchors
-		if (
-			obj.id &&
-			obj.id.includes("anchor") &&
-			(obj.type === "Rect" || obj.type === "rect") &&
-			obj.strokeDashArray &&
-			Array.isArray(obj.strokeDashArray)
-		) {
-			return { ...obj, visible: false };
-		}
+			// Hide standalone dotted rect anchors
+			if (
+				obj.id &&
+				obj.id.includes("anchor") &&
+				(obj.type === "Rect" || obj.type === "rect") &&
+				obj.strokeDashArray &&
+				Array.isArray(obj.strokeDashArray)
+			) {
+				return { ...obj, visible: false };
+			}
 
-		return obj;
+			return obj;
+		} catch (e) {
+			vLog("cleanDesignForThumbnail:object:error", formatError(e));
+			return obj;
+		}
 	});
 
 	// Filter out invisible objects
@@ -361,56 +494,87 @@ function cleanDesignForThumbnail(design: any): any {
 
 // Load canvas with fallback handling
 async function loadCanvasWithImageFallback(designStr: string): Promise<fabric.Canvas> {
-	const design = JSON.parse(designStr);
+	const design = withTiming("loadCanvas:parseDesign", () => JSON.parse(designStr));
 
 	// Create fabric canvas with high-quality settings
-	const canvas = new fabric.Canvas(null, {
-		width: design.width || 850,
-		height: design.height || 600,
-		backgroundColor: design.background || "#ffffff",
-		renderOnAddRemove: false, // Prevent automatic rendering for better performance
-		enableRetinaScaling: true, // Enable retina/high-DPI scaling
-	});
+	const canvas = withTiming(
+		"loadCanvas:newFabricCanvas",
+		() =>
+			new fabric.Canvas(null, {
+				width: design.width || 850,
+				height: design.height || 600,
+				backgroundColor: design.background || "#ffffff",
+				renderOnAddRemove: false, // Prevent automatic rendering for better performance
+				enableRetinaScaling: true, // Enable retina/high-DPI scaling
+			})
+	);
 
 	// Add font fallbacks for production environment
 	if (design.objects && Array.isArray(design.objects)) {
-		design.objects = design.objects.map((obj: any) => {
-			if (
-				obj.type === "Textbox" ||
-				obj.type === "textbox" ||
-				obj.type === "Text" ||
-				obj.type === "text"
-			) {
-				// Ensure font fallbacks for production
-				if (obj.fontFamily && !obj.fontFamily.includes(",")) {
-					obj.fontFamily = `${obj.fontFamily}, Arial, sans-serif`;
-				} else if (!obj.fontFamily) {
-					obj.fontFamily = "Arial, sans-serif";
+		try {
+			design.objects = design.objects.map((obj: any, idx: number) => {
+				try {
+					if (
+						obj.type === "Textbox" ||
+						obj.type === "textbox" ||
+						obj.type === "Text" ||
+						obj.type === "text"
+					) {
+						// Ensure font fallbacks for production
+						if (obj.fontFamily && !obj.fontFamily.includes(",")) {
+							obj.fontFamily = `${obj.fontFamily}, Arial, sans-serif`;
+						} else if (!obj.fontFamily) {
+							obj.fontFamily = "Arial, sans-serif";
+						}
+						vLog("loadCanvas:textObject", {
+							idx,
+							font: obj.fontFamily,
+							textLen: (obj.text || "").length,
+						});
+					}
+					return obj;
+				} catch (e) {
+					vLog("loadCanvas:textObject:error", { idx, ...formatError(e) });
+					return obj;
 				}
-				console.error(`DEBUG: Text object font: ${obj.fontFamily}, text: "${obj.text}"`);
-			}
-			return obj;
-		});
+			});
+		} catch (e) {
+			vLog("loadCanvas:objectsMap:error", formatError(e));
+		}
 	}
 
 	// Load design into canvas
 	await new Promise<void>((resolve) => {
-		canvas.loadFromJSON(
-			design,
-			() => {
-				canvas.renderAll();
-				resolve();
-			},
-			(_o: any, object: any) => {
-				// Handle individual object loading errors
-				if (object.type === "image" && object.src) {
-					// Fallback for WebP images - replace with PNG/JPG
-					if (object.src.includes(".webp")) {
-						object.src = object.src.replace(".webp", ".png");
+		try {
+			canvas.loadFromJSON(
+				design,
+				() => {
+					try {
+						canvas.renderAll();
+					} catch (e) {
+						vLog("loadCanvas:renderAll:error", formatError(e));
+					}
+					resolve();
+				},
+				(_o: any, object: any) => {
+					// Handle individual object loading errors
+					try {
+						if (object.type === "image" && object.src) {
+							// Fallback for WebP images - replace with PNG/JPG
+							if (typeof object.src === "string" && object.src.includes(".webp")) {
+								vLog("loadCanvas:image:webpFallback", { src: object.src });
+								object.src = object.src.replace(".webp", ".png");
+							}
+						}
+					} catch (e) {
+						vLog("loadCanvas:reviver:error", formatError(e));
 					}
 				}
-			}
-		);
+			);
+		} catch (e) {
+			vLog("loadCanvas:loadFromJSON:error", formatError(e));
+			resolve();
+		}
 	});
 
 	return canvas;
@@ -425,26 +589,40 @@ async function generateCertificateImage(
 	watermark?: string
 ): Promise<RenderResult> {
 	try {
+		vLog("generateCertificateImage:start", {
+			participantId: participant?.id,
+			certificateId: certificate?.id,
+			hasQRCode: !!qrCode,
+			qrLen: qrCode?.length || 0,
+			signatureCount: signatures ? Object.keys(signatures).length : 0,
+			hasWatermark: !!watermark,
+		});
 		// Replace placeholders with participant data
-		const processedDesign = replacePlaceholders(
-			certificate.design,
-			participant,
-			qrCode,
-			signatures,
-			watermark
+		const processedDesign = withTiming("generateCertificateImage:replacePlaceholders", () =>
+			replacePlaceholders(certificate.design, participant, qrCode, signatures, watermark)
 		);
 
 		// Load canvas
-		const canvas = await loadCanvasWithImageFallback(processedDesign);
+		const canvas = await withTimingAsync("generateCertificateImage:loadCanvas", () =>
+			loadCanvasWithImageFallback(processedDesign)
+		);
 
 		// Export as base64 with high quality settings
-		const imageBase64 = canvas
-			.toDataURL({
-				format: "png",
-				quality: 1.0, // Maximum quality
-				multiplier: 2, // 2x resolution for crisp output
-			})
-			.split(",")[1];
+		const imageBase64 = withTiming(
+			"generateCertificateImage:toDataURL",
+			() =>
+				canvas
+					.toDataURL({
+						format: "png",
+						quality: 1.0, // Maximum quality
+						multiplier: 2, // 2x resolution for crisp output
+					})
+					.split(",")[1]
+		);
+		vLog("generateCertificateImage:done", {
+			participantId: participant.id,
+			imgLen: imageBase64?.length || 0,
+		});
 
 		return {
 			participantId: participant.id,
@@ -452,6 +630,10 @@ async function generateCertificateImage(
 			status: "success",
 		};
 	} catch (error) {
+		vLog("generateCertificateImage:error", {
+			participantId: participant?.id,
+			...formatError(error),
+		});
 		return {
 			participantId: participant.id,
 			imageBase64: "",
@@ -466,8 +648,12 @@ async function generateCertificateThumbnail(
 	certificate: CertificateData
 ): Promise<ThumbnailResult> {
 	try {
+		vLog("generateCertificateThumbnail:start", {
+			certificateId: certificate?.id,
+			designLen: certificate?.design?.length || 0,
+		});
 		// Use original design without placeholder replacement
-		const design = JSON.parse(certificate.design);
+		const design = withTiming("thumbnail:parseDesign", () => JSON.parse(certificate.design));
 
 		// Get original dimensions or use defaults
 		const originalWidth = design.width || 850;
@@ -491,15 +677,24 @@ async function generateCertificateThumbnail(
 			canvas.loadFromJSON(
 				cleanedDesign,
 				() => {
-					canvas.renderAll();
+					try {
+						canvas.renderAll();
+					} catch (e) {
+						vLog("thumbnail:renderAll:error", formatError(e));
+					}
 					resolve();
 				},
 				(_o: any, object: any) => {
 					// Handle individual object loading errors for thumbnails
 					if (object.type === "image" && object.src) {
 						// Fallback for WebP images
-						if (object.src.includes(".webp")) {
-							object.src = object.src.replace(".webp", ".png");
+						try {
+							if (typeof object.src === "string" && object.src.includes(".webp")) {
+								vLog("thumbnail:image:webpFallback", { src: object.src });
+								object.src = object.src.replace(".webp", ".png");
+							}
+						} catch (e) {
+							vLog("thumbnail:reviver:error", formatError(e));
 						}
 					}
 				}
@@ -526,19 +721,28 @@ async function generateCertificateThumbnail(
 		);
 
 		// Export with proper scaling - use PNG to avoid black background issues
-		const imageBase64 = canvas
-			.toDataURL({
-				format: "png", // Use PNG to preserve transparency and avoid black backgrounds
-				quality: 1.0, // Maximum quality for PNG
-				multiplier: scaleFactor, // Scale down to thumbnail size
-			})
-			.split(",")[1];
+		const imageBase64 = withTiming(
+			"thumbnail:toDataURL",
+			() =>
+				canvas
+					.toDataURL({
+						format: "png", // Use PNG to preserve transparency and avoid black backgrounds
+						quality: 1.0, // Maximum quality for PNG
+						multiplier: scaleFactor, // Scale down to thumbnail size
+					})
+					.split(",")[1]
+		);
+		vLog("generateCertificateThumbnail:done", {
+			imgLen: imageBase64?.length || 0,
+			scaleFactor,
+		});
 
 		return {
 			imageBase64,
 			status: "success",
 		};
 	} catch (error) {
+		vLog("generateCertificateThumbnail:error", formatError(error));
 		return {
 			imageBase64: "",
 			status: "error",
@@ -557,21 +761,31 @@ async function processBatch<T, R>(
 
 	for (let i = 0; i < items.length; i += batchSize) {
 		const batch = items.slice(i, i + batchSize);
-		console.error(
-			`DEBUG: Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(
-				items.length / batchSize
-			)} (${batch.length} items)`
-		);
+		vLog("processBatch:begin", {
+			batchIndex: Math.floor(i / batchSize) + 1,
+			batchCount: Math.ceil(items.length / batchSize),
+			batchSize: batch.length,
+		});
 
-		const batchPromises = batch.map(processor);
-		const batchResults = await Promise.all(batchPromises);
-		results.push(...batchResults);
-
-		console.error(
-			`DEBUG: Completed batch ${Math.floor(i / batchSize) + 1}, ${
-				batchResults.length
-			} certificates generated`
+		const batchPromises = batch.map((it, idx) =>
+			withTimingAsync("processBatch:item", () => processor(it)).catch((e) => {
+				vLog("processBatch:item:error", { idx, ...formatError(e) });
+				throw e;
+			})
 		);
+		const batchResults = await Promise.allSettled(batchPromises);
+		const fulfilled = batchResults.filter(isFulfilled).map((r) => r.value);
+		const rejected = batchResults.filter(isRejected);
+		if (rejected.length) {
+			vLog("processBatch:rejections", { count: rejected.length });
+		}
+		results.push(...fulfilled);
+
+		vLog("processBatch:end", {
+			batchIndex: Math.floor(i / batchSize) + 1,
+			generated: fulfilled.length,
+			failed: rejected.length,
+		});
 	}
 
 	return results;
@@ -580,7 +794,13 @@ async function processBatch<T, R>(
 // Main processing function with smart parallelization
 async function processRenderRequest(request: RenderRequest): Promise<RenderResult[]> {
 	const participantCount = request.participants.length;
-	console.error(`DEBUG: Starting processing of ${participantCount} participants`);
+	vLog("processRenderRequest:start", {
+		participants: participantCount,
+		certificateId: request.certificate?.id,
+		signatureCount: request.signatures ? Object.keys(request.signatures).length : 0,
+		hasWatermark: !!request.watermark,
+		qrCount: request.qrCodes ? Object.keys(request.qrCodes).length : 0,
+	});
 
 	// Determine batch size based on participant count
 	// For small batches: process all in parallel
@@ -590,17 +810,17 @@ async function processRenderRequest(request: RenderRequest): Promise<RenderResul
 			? participantCount
 			: Math.min(10, Math.max(5, Math.ceil(participantCount / 4)));
 
-	console.error(`DEBUG: Using batch size: ${batchSize} for ${participantCount} participants`);
+	vLog("processRenderRequest:batch", { batchSize, participants: participantCount });
 
 	const processor = async (participant: ParticipantData): Promise<RenderResult> => {
 		const qrCode = request.qrCodes?.[participant.id];
-		console.error(
-			`DEBUG: Processing participant ${
-				participant.id
-			}, QR code available: ${!!qrCode}, QR length: ${
-				qrCode?.length || 0
-			}, signatures available: ${!!request.signatures}, watermark available: ${!!request.watermark}`
-		);
+		vLog("processRenderRequest:participant", {
+			participantId: participant.id,
+			hasQRCode: !!qrCode,
+			qrLen: qrCode?.length || 0,
+			hasSignatures: !!request.signatures,
+			hasWatermark: !!request.watermark,
+		});
 		return generateCertificateImage(
 			request.certificate,
 			participant,
@@ -610,8 +830,10 @@ async function processRenderRequest(request: RenderRequest): Promise<RenderResul
 		);
 	};
 
-	const results = await processBatch(request.participants, batchSize, processor);
-	console.error(`DEBUG: Completed all processing, ${results.length} total results`);
+	const results = await withTimingAsync("processRenderRequest:processBatch", () =>
+		processBatch(request.participants, batchSize, processor)
+	);
+	vLog("processRenderRequest:done", { results: results.length });
 
 	return results;
 }
@@ -619,22 +841,34 @@ async function processRenderRequest(request: RenderRequest): Promise<RenderResul
 // Main execution
 async function main() {
 	try {
+		vLog("main:start");
 		// Read JSON from stdin
 		const input = await new Promise<string>((resolve) => {
 			let data = "";
-			process.stdin.on("data", (chunk: any) => {
-				data += chunk.toString();
-			});
-			process.stdin.on("end", () => {
+			try {
+				process.stdin.on("data", (chunk: any) => {
+					try {
+						data += chunk.toString();
+					} catch (e) {
+						vLog("main:stdin:data:error", formatError(e));
+					}
+				});
+				process.stdin.on("end", () => {
+					vLog("main:stdin:end", { bytes: data.length });
+					resolve(data);
+				});
+			} catch (e) {
+				vLog("main:stdin:setup:error", formatError(e));
 				resolve(data);
-			});
+			}
 		});
 
 		if (!input.trim()) {
 			throw new Error("No input data received");
 		}
 
-		const request: any = JSON.parse(input);
+		const request: any = withTiming("main:parseRequest", () => JSON.parse(input));
+		vLog("main:request:parsed", { isThumbnail: request?.mode === "thumbnail" });
 
 		// Check if this is a thumbnail request
 		if (request.mode === "thumbnail") {
@@ -645,7 +879,9 @@ async function main() {
 			}
 
 			// Process thumbnail rendering
-			const result = await generateCertificateThumbnail(thumbnailRequest.certificate);
+			const result = await withTimingAsync("main:thumbnail", () =>
+				generateCertificateThumbnail(thumbnailRequest.certificate)
+			);
 
 			// Output result as JSON to stdout
 			console.log(JSON.stringify(result));
@@ -658,19 +894,25 @@ async function main() {
 			}
 
 			// Process the rendering
-			const results = await processRenderRequest(renderRequest);
+			const results = await withTimingAsync("main:render", () =>
+				processRenderRequest(renderRequest)
+			);
 
 			// Output results as JSON to stdout
 			console.log(JSON.stringify(results));
 		}
 
+		vLog("main:exit", { code: 0 });
 		process.exit(0);
 	} catch (error) {
+		const fe = formatError(error);
 		const errorResult = {
-			error: error instanceof Error ? error.message : "Unknown error",
+			error: fe.message,
 			status: "error",
+			stack: fe.stack,
 		};
 
+		vLog("main:fatal", fe);
 		console.error(JSON.stringify(errorResult));
 		process.exit(1);
 	}
