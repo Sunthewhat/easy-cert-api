@@ -20,7 +20,7 @@ func InitMinIO() error {
 
 	client, err := minio.New(*common.Config.MinIoEndpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(*common.Config.MinIoAccessKey, *common.Config.MinIoSecretKey, ""),
-		Secure: true,
+		Secure: *common.Config.IsHTTPS,
 	})
 
 	if err != nil {
@@ -67,7 +67,11 @@ func UploadFile(ctx context.Context, bucketName string, objectName string, file 
 	}
 
 	// Return the object URL or info
-	url := fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, bucketName, objectName)
+	protocol := "http"
+	if *common.Config.IsHTTPS {
+		protocol = "https"
+	}
+	url := fmt.Sprintf("%s://%s/%s/%s", protocol, *common.Config.MinIoEndpoint, bucketName, objectName)
 	_ = info // We have the upload info if needed
 
 	return url, nil
@@ -121,7 +125,11 @@ func ListFilesByPrefix(ctx context.Context, bucketName string, prefix string, li
 			break
 		}
 
-		url := fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, bucketName, object.Key)
+		protocol := "http"
+		if *common.Config.IsHTTPS {
+			protocol = "https"
+		}
+		url := fmt.Sprintf("%s://%s/%s/%s", protocol, *common.Config.MinIoEndpoint, bucketName, object.Key)
 		fileURLs = append(fileURLs, url)
 		count++
 	}

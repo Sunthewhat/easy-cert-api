@@ -541,9 +541,7 @@ func (r *EmbeddedRenderer) ProcessThumbnail(ctx context.Context, certificate any
 		return "", fmt.Errorf("failed to upload thumbnail to MinIO: %w", err)
 	}
 
-	// Generate the direct URL for debugging
-	directURL := fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, bucketName, filename)
-	slog.Info("Thumbnail uploaded to MinIO", "filename", filename, "directURL", directURL)
+	slog.Info("Thumbnail uploaded to MinIO", "filename", filename)
 
 	return filename, nil
 }
@@ -716,9 +714,7 @@ func (r *EmbeddedRenderer) UploadToMinIOWithContentType(data []byte, filename st
 		return "", fmt.Errorf("failed to upload to MinIO: %w", err)
 	}
 
-	// Generate the direct URL for debugging
-	directURL := fmt.Sprintf("https://%s/%s/%s", *common.Config.MinIoEndpoint, bucketName, filename)
-	slog.Info("File uploaded to MinIO", "filename", filename, "contentType", contentType, "directURL", directURL)
+	slog.Info("File uploaded to MinIO", "filename", filename, "contentType", contentType)
 
 	return filename, nil
 }
