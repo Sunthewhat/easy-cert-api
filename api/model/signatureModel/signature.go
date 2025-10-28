@@ -91,7 +91,7 @@ func MarkAsRequested(certificateId, signerId string) error {
 	).Where(
 		common.Gorm.Signature.SignerID.Eq(signerId),
 	).Updates(map[string]interface{}{
-		"is_requested":  true,
+		"is_requested": true,
 		"last_request": time.Now(),
 	})
 
@@ -154,7 +154,6 @@ func BulkCreateSignatures(certificateId string, signerIds []string, userId strin
 
 	return nil
 }
-
 
 // GetPendingSignaturesForReminder returns signatures that need reminder emails
 // (requested but not signed, and last request was more than 24 hours ago)
@@ -250,11 +249,6 @@ func AreAllSignaturesComplete(certificateId string) (bool, error) {
 	if err != nil {
 		slog.Error("AreAllSignaturesComplete: Error fetching signatures", "error", err, "certificateId", certificateId)
 		return false, err
-	}
-
-	// If no signatures exist, return false
-	if len(signatures) == 0 {
-		return false, nil
 	}
 
 	// Check if all signatures are signed

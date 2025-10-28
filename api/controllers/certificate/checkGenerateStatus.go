@@ -6,10 +6,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
+	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
 type responseStruct struct {
+	IsSigned           bool `json:"is_signed"`
 	IsGenerated        bool `json:"is_generated"`
 	IsPartialGenerated bool `json:"is_partial_generated"`
 }
@@ -31,8 +33,26 @@ func CheckGenerateStatus(c *fiber.Ctx) error {
 
 	returnResponse := new(responseStruct)
 
+	if !cert.IsSigned {
+		notHaveSignature, err := signaturemodel.AreAllSignaturesComplete(certificateId)
+		if err != nil {
+			return response.SendInternalError(c, err)
+		}
+
+		if !notHaveSignature {
+			returnResponse = &responseStruct{
+				IsSigned:           false,
+				IsGenerated:        false,
+				IsPartialGenerated: false,
+			}
+
+			return response.SendSuccess(c, "Certificate is not signed", returnResponse)
+		}
+	}
+
 	if !cert.IsDistributed {
 		returnResponse = &responseStruct{
+			IsSigned:           true,
 			IsGenerated:        false,
 			IsPartialGenerated: false,
 		}
@@ -56,6 +76,7 @@ func CheckGenerateStatus(c *fiber.Ctx) error {
 	}
 
 	returnResponse = &responseStruct{
+		IsSigned:           true,
 		IsGenerated:        true,
 		IsPartialGenerated: isPartialGenerated,
 	}
