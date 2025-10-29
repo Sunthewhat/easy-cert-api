@@ -36,6 +36,8 @@ func GetSignerData(c *fiber.Ctx) error {
 		return response.SendError(c, "Failed to read user")
 	}
 
+	slog.Info("Requesting Signer Data", "certId", certificateId, "user", userEmail)
+
 	// Get signer by email
 	signer, err := signermodel.GetByEmail(userEmail)
 	if err != nil {
