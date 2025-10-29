@@ -55,8 +55,8 @@ func GetById(signerId string) (*model.Signer, error) {
 	return signer, nil
 }
 
-func GetByEmail(email string) (*model.Signer, error) {
-	signer, queryErr := common.Gorm.Signer.Where(common.Gorm.Signer.Email.Eq(email)).First()
+func GetByEmail(email string, creatorId string) (*model.Signer, error) {
+	signer, queryErr := common.Gorm.Signer.Where(common.Gorm.Signer.Email.Eq(email)).Where(common.Gorm.Signer.CreatedBy.Eq(creatorId)).First()
 
 	if queryErr != nil {
 		if errors.Is(queryErr, gorm.ErrRecordNotFound) {

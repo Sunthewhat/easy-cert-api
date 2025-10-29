@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
+	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -36,10 +37,16 @@ func GetSignerData(c *fiber.Ctx) error {
 		return response.SendError(c, "Failed to read user")
 	}
 
+	cert, err := certificatemodel.GetById(certificateId)
+	if err != nil {
+		slog.Error("GetSignerData: Error getting certificate", "certId", certificateId)
+		return response.SendError(c, "Certificate not found")
+	}
+
 	slog.Info("Requesting Signer Data", "certId", certificateId, "user", userEmail)
 
 	// Get signer by email
-	signer, err := signermodel.GetByEmail(userEmail)
+	signer, err := signermodel.GetByEmail(userEmail, cert.UserID)
 	if err != nil {
 		slog.Error("GetSignerData: Error fetching signer", "error", err, "email", userEmail)
 		return response.SendInternalError(c, err)
