@@ -49,6 +49,8 @@ func GetSignerData(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Signer not found")
 	}
 
+	slog.Info("Found Signer", "signerId", signer.ID)
+
 	// Get signature by certificate ID and signer ID
 	signature, err := signaturemodel.GetByCertificateAndSignerId(certificateId, signer.ID)
 	if err != nil {

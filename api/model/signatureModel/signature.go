@@ -43,6 +43,7 @@ func GetById(signatureId string) (*model.Signature, error) {
 }
 
 func GetByCertificateAndSignerId(certificateId string, signerId string) (*model.Signature, error) {
+	slog.Info("Requesting signature", "certId", certificateId, "signerId", signerId)
 	signature, queryErr := common.Gorm.Signature.Where(common.Gorm.Signature.CertificateID.Eq(certificateId)).Where(common.Gorm.Signature.SignerID.Eq(signerId)).First()
 
 	if queryErr != nil {
