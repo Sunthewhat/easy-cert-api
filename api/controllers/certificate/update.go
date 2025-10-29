@@ -118,6 +118,7 @@ func Update(c *fiber.Ctx) error {
 	if !isAutoSave && body.Design != "" {
 		// Extract signer IDs from the updated design
 		newSignerIds, extractErr := extractSignerIdsFromDesign(updatedCert.Design)
+		slog.Info("Found signers", "signerIds", newSignerIds)
 		if extractErr != nil {
 			slog.Warn("Certificate Update: Failed to extract signer IDs from design", "error", extractErr, "cert_id", id)
 		} else {
