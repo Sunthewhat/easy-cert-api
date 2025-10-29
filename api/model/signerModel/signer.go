@@ -68,3 +68,15 @@ func GetByEmail(email string, creatorId string) (*model.Signer, error) {
 
 	return signer, nil
 }
+
+func IsEmailExisted(email string) (bool, error) {
+	_, queryErr := common.Gorm.Signer.Where(common.Gorm.Signer.Email.Eq(email)).First()
+	if queryErr != nil {
+		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		slog.Error("Signer model IsEmailExisted Error", "error", queryErr, "email", email)
+		return false, nil
+	}
+	return true, nil
+}

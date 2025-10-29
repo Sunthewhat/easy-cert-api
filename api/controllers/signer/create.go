@@ -30,6 +30,16 @@ func Create(c *fiber.Ctx) error {
 		return response.SendUnauthorized(c, "Invalid token context")
 	}
 
+	isEmailExisted, err := signermodel.IsEmailExisted(body.Email)
+
+	if err != nil {
+		return response.SendInternalError(c, err)
+	}
+
+	if isEmailExisted {
+		return response.SendFailed(c, "Signer with this email already existed")
+	}
+
 	newSigner, err := signermodel.Create(*body, userId)
 
 	if err != nil {
