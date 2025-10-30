@@ -13,4 +13,5 @@ func SetupSignerRoutes(router fiber.Router) {
 
 	signerGroup.Get("", signer_controller.GetByUser)
 	signerGroup.Post("", signer_controller.Create)
+	signerGroup.Get("status/:certId", signer_controller.GetStatus)
 }
