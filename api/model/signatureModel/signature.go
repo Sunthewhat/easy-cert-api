@@ -104,6 +104,23 @@ func MarkAsRequested(certificateId, signerId string) error {
 	return nil
 }
 
+func UpdateAfterRequestResign(signatureId string) error {
+	_, err := common.Gorm.Signature.Where(
+		common.Gorm.Signature.ID.Eq(signatureId),
+	).Updates(map[string]any{
+		"is_requested": true,
+		"is_signed":    false,
+		"signature":    "",
+		"last_request": time.Now(),
+	})
+
+	if err != nil {
+		slog.Error("UpdateAfterRequestResign Error", "error", err, "signatureId", signatureId)
+		return err
+	}
+	return nil
+}
+
 // BulkCreateSignatures creates signature records for multiple signers for a certificate
 // Skips signers that already have signatures for this certificate
 func BulkCreateSignatures(certificateId string, signerIds []string, userId string) error {

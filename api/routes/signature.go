@@ -16,4 +16,5 @@ func SetupSignatureRoutes(router fiber.Router) {
 	signatureGroup.Get(":id", signature_controller.GetById)
 	signatureGroup.Put("sign/:id", signature_controller.Sign)
 	signatureGroup.Get(":certificateId/:signerId", signature_controller.GetSignatureImage)
+	signatureGroup.Get("resign/:signatureId", signature_controller.RequestResign)
 }
