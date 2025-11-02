@@ -48,5 +48,8 @@ func main() {
 	// Start signature reminder job for daily email reminders
 	util.StartSignatureReminderJob()
 
+	// Start preview cleanup job for removing old preview images (30 days)
+	util.StartPreviewCleanupJob()
+
 	api.InitFiber()
 }

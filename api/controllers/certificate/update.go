@@ -187,7 +187,7 @@ func Update(c *fiber.Ctx) error {
 							slog.Warn("Certificate Update: Failed to mark certificate as signed", "error", markErr, "cert_id", id)
 						}
 
-						notifyErr := util.SendAllSignaturesCompleteMail(updatedCert.UserID, updatedCert.Name, updatedCert.ID)
+						notifyErr := util.SendAllSignaturesCompleteMail(updatedCert.UserID, updatedCert.Name, updatedCert.ID, "")
 						if notifyErr != nil {
 							slog.Warn("Certificate Update: Failed to send completion notification", "error", notifyErr, "cert_id", id, "owner", updatedCert.UserID)
 						} else {

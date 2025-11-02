@@ -1,14 +1,20 @@
 package signature_controller
 
 import (
+	"context"
+	"encoding/base64"
 	"io"
 	"log/slog"
+	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
+	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
+	"github.com/sunthewhat/easy-cert-api/internal/renderer"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
@@ -79,8 +85,105 @@ func Sign(c *fiber.Ctx) error {
 				// Don't fail the request - signature was uploaded successfully
 			}
 
-			// Send notification email to certificate owner
-			notifyErr := util.SendAllSignaturesCompleteMail(certificate.UserID, certificate.Name, certificate.ID)
+			// Generate preview certificate with signatures and watermark
+			previewPath := ""
+			previewErr := func() error {
+				// Get all participants
+				participants, partErr := participantmodel.GetParticipantsByCertId(certificate.ID)
+				if partErr != nil {
+					return partErr
+				}
+
+				if len(participants) == 0 {
+					slog.Warn("No participants found for preview generation", "certificateId", certificate.ID)
+					return nil // Skip preview generation
+				}
+
+				// Get all signatures and decrypt them
+				allSignatures, sigErr := signaturemodel.GetSignaturesByCertificate(certificate.ID)
+				if sigErr != nil {
+					return sigErr
+				}
+
+				// Decrypt signature images and create a map of signerId -> base64 image
+				decryptedSignatures := make(map[string]string)
+				for _, sig := range allSignatures {
+					if sig.IsSigned && sig.Signature != "" {
+						decryptedImage, decryptErr := util.DecryptData(sig.Signature, *common.Config.EncryptionKey)
+						if decryptErr != nil {
+							slog.Warn("Failed to decrypt signature for preview",
+								"error", decryptErr,
+								"cert_id", certificate.ID,
+								"signer_id", sig.SignerID)
+							continue
+						}
+						decryptedSignatures[sig.SignerID] = base64.StdEncoding.EncodeToString(decryptedImage)
+					}
+				}
+
+				slog.Info("Decrypted signatures for preview",
+					"cert_id", certificate.ID,
+					"total_signatures", len(allSignatures),
+					"decrypted_count", len(decryptedSignatures))
+
+				// Convert participants to interface{} slice
+				participantInterfaces := make([]any, len(participants))
+				for i, p := range participants {
+					participantInterfaces[i] = p
+				}
+
+				// Prepare certificate design
+				certDesign := certificate.Design
+				if *common.Config.Environment {
+					certDesign = strings.ReplaceAll(
+						certDesign,
+						"http://easycert.sit.kmutt.ac.th",
+						"http://backend:8000",
+					)
+				}
+
+				// Convert certificate struct to map for renderer compatibility
+				certMap := map[string]any{
+					"id":     certificate.ID,
+					"name":   certificate.Name,
+					"design": certDesign,
+				}
+
+				// Initialize embedded renderer
+				embeddedRenderer, rendererErr := renderer.NewEmbeddedRenderer()
+				if rendererErr != nil {
+					return rendererErr
+				}
+				defer embeddedRenderer.Close()
+
+				// Create context with timeout
+				ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+				defer cancel()
+
+				// Generate preview with watermark
+				previewBytes, previewGenErr := embeddedRenderer.GeneratePreviewWithWatermark(ctx, certMap, participantInterfaces, decryptedSignatures, certificate.ID)
+				if previewGenErr != nil {
+					return previewGenErr
+				}
+
+				// Save preview to MinIO
+				savedPath, saveErr := embeddedRenderer.SavePreviewToMinIO(previewBytes, certificate.ID)
+				if saveErr != nil {
+					return saveErr
+				}
+
+				previewPath = savedPath
+				slog.Info("Preview generated and saved successfully", "certificateId", certificate.ID, "previewPath", previewPath)
+				return nil
+			}()
+
+			if previewErr != nil {
+				slog.Error("Failed to generate preview certificate", "error", previewErr, "certificateId", certificate.ID)
+				// Don't fail the request - signature was uploaded successfully
+			}
+
+			// Send notification email to certificate owner with preview
+			notifyErr := util.SendAllSignaturesCompleteMail(certificate.UserID, certificate.Name, certificate.ID, previewPath)
 			if notifyErr != nil {
 				slog.Error("Failed to send completion notification email", "error", notifyErr, "certificateId", certificate.ID, "owner", certificate.UserID)
 				// Don't fail the request - signature was uploaded successfully

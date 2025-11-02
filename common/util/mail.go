@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/minio/minio-go/v7"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/common"
@@ -318,11 +320,22 @@ func BulkSendSignatureRequests(certificateId, certificateName string, signerIds 
 }
 
 // SendAllSignaturesCompleteMail sends notification to certificate owner when all signatures are complete
-func SendAllSignaturesCompleteMail(ownerEmail, certificateName, certificateId string) error {
+// with an optional preview image attachment
+func SendAllSignaturesCompleteMail(ownerEmail, certificateName, certificateId, previewPath string) error {
 	mailer := gomail.NewMessage()
 	mailer.SetHeader("From", *common.Config.MailUser)
 	mailer.SetHeader("To", ownerEmail)
 	mailer.SetHeader("Subject", fmt.Sprintf("All Signatures Complete - %s", certificateName))
+
+	// Build HTML body with preview mention if preview is available
+	previewMessage := ""
+	if previewPath != "" {
+		previewMessage = `
+					<p class="message">
+						A preview of the signed certificate is attached to this email for your convenience.
+						Please note that the preview includes a watermark and is for reference only.
+					</p>`
+	}
 
 	htmlBody := fmt.Sprintf(`
 		<!DOCTYPE html>
@@ -421,6 +434,7 @@ func SendAllSignaturesCompleteMail(ownerEmail, certificateName, certificateId st
 						<div class="certificate-name">%s</div>
 						<div class="certificate-id">Certificate ID: %s</div>
 					</div>
+					%s
 					<p class="message">
 						You can now view and distribute the fully signed certificate through your dashboard.
 					</p>
@@ -432,15 +446,64 @@ func SendAllSignaturesCompleteMail(ownerEmail, certificateName, certificateId st
 			</div>
 		</body>
 		</html>
-	`, certificateName, certificateId)
+	`, certificateName, certificateId, previewMessage)
 
 	mailer.SetBody("text/html", htmlBody)
+
+	// Attach preview image if available
+	if previewPath != "" {
+		// Download preview from MinIO
+		previewFile, downloadErr := downloadPreviewFromMinIO(previewPath)
+		if downloadErr != nil {
+			slog.Warn("Failed to download preview for email attachment", "error", downloadErr, "previewPath", previewPath)
+			// Continue sending email without preview
+		} else {
+			defer os.Remove(previewFile) // Clean up temp file after sending
+
+			// Attach preview image
+			mailer.Attach(previewFile, gomail.Rename("certificate_preview.png"), gomail.SetHeader(map[string][]string{
+				"Content-Type": {"image/png"},
+			}))
+			slog.Info("Preview attached to email", "previewPath", previewPath, "recipient", ownerEmail)
+		}
+	}
 
 	if err := common.Dialer.DialAndSend(mailer); err != nil {
 		slog.Error("Failed to send all signatures complete email", "error", err, "recipient", ownerEmail, "certificateId", certificateId)
 		return err
 	}
 
-	slog.Info("All signatures complete email sent successfully", "recipient", ownerEmail, "certificateId", certificateId)
+	slog.Info("All signatures complete email sent successfully", "recipient", ownerEmail, "certificateId", certificateId, "withPreview", previewPath != "")
 	return nil
+}
+
+// downloadPreviewFromMinIO downloads a preview image from MinIO to a temporary file
+func downloadPreviewFromMinIO(objectPath string) (string, error) {
+	bucketName := *common.Config.BucketCertificate
+
+	// Create temporary file
+	tempFile, err := os.CreateTemp("", "preview-*.png")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer tempFile.Close()
+
+	// Download from MinIO
+	ctx := context.Background()
+	object, err := common.MinIOClient.GetObject(ctx, bucketName, objectPath, minio.GetObjectOptions{})
+	if err != nil {
+		os.Remove(tempFile.Name())
+		return "", fmt.Errorf("failed to get object from MinIO: %w", err)
+	}
+	defer object.Close()
+
+	// Copy to temp file
+	_, err = io.Copy(tempFile, object)
+	if err != nil {
+		os.Remove(tempFile.Name())
+		return "", fmt.Errorf("failed to copy preview to temp file: %w", err)
+	}
+
+	slog.Info("Preview downloaded from MinIO", "objectPath", objectPath, "tempFile", tempFile.Name())
+	return tempFile.Name(), nil
 }

@@ -769,6 +769,217 @@ func (r *EmbeddedRenderer) CreateZipArchive(results []CertificateResult) ([]byte
 	return buf.Bytes(), nil
 }
 
+// GeneratePreviewWithWatermark generates a preview certificate image with all signatures and a watermark
+func (r *EmbeddedRenderer) GeneratePreviewWithWatermark(ctx context.Context, certificate any, participants []any, signatures map[string]string, certificateID string) ([]byte, error) {
+	// Generate QR codes for preview
+	qrCodes := r.GenerateQRCodes(participants, certificateID)
+
+	// Encode watermark image to base64 - using the embedded watermark
+	watermarkBase64 := base64.StdEncoding.EncodeToString(watermarkPNG)
+
+	// Prepare request - take first participant as sample for preview
+	if len(participants) == 0 {
+		return nil, fmt.Errorf("no participants found for preview")
+	}
+
+	// Render just the first certificate as preview
+	request := RenderRequest{
+		Certificate:  certificate,
+		Participants: []any{participants[0]}, // Just first participant for preview
+		QRCodes:      qrCodes,
+		Signatures:   signatures,
+		Watermark:    watermarkBase64,
+	}
+
+	requestJSON, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal preview request: %w", err)
+	}
+
+	// Execute Bun renderer
+	cmd := exec.CommandContext(ctx, "bun", "renderer.ts")
+	cmd.Dir = r.rendererDir
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start Bun renderer for preview: %w", err)
+	}
+
+	// Send request data
+	go func() {
+		defer stdin.Close()
+		stdin.Write(requestJSON)
+	}()
+
+	// Read output
+	outputBytes, err := io.ReadAll(stdout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read stdout: %w", err)
+	}
+
+	errorBytes, err := io.ReadAll(stderr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read stderr: %w", err)
+	}
+
+	// Wait for command to finish
+	if err := cmd.Wait(); err != nil {
+		return nil, fmt.Errorf("bun renderer failed for preview: %w, stderr: %s", err, string(errorBytes))
+	}
+
+	// Parse results
+	var results []RenderResult
+	if err := json.Unmarshal(outputBytes, &results); err != nil {
+		return nil, fmt.Errorf("failed to parse renderer output: %w, output: %s", err, string(outputBytes))
+	}
+
+	if len(results) == 0 || results[0].Status != "success" {
+		return nil, fmt.Errorf("preview rendering failed")
+	}
+
+	// Decode base64 image to bytes
+	imageBytes, err := base64.StdEncoding.DecodeString(results[0].ImageBase64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode preview image: %w", err)
+	}
+
+	return imageBytes, nil
+}
+
+// SavePreviewToMinIO saves a preview image to MinIO in the previews folder
+func (r *EmbeddedRenderer) SavePreviewToMinIO(previewBytes []byte, certificateID string) (string, error) {
+	bucketName := *common.Config.BucketCertificate
+
+	// Delete old previews for this certificate first
+	r.deleteOldPreviews(bucketName, certificateID)
+
+	// Generate filename with previews prefix and timestamp
+	timestamp := time.Now().Unix()
+	filename := fmt.Sprintf("previews/%s/preview_%d.png", certificateID, timestamp)
+
+	// Ensure bucket exists and has public read policy
+	if err := r.ensureBucketPublic(bucketName); err != nil {
+		slog.Warn("Failed to ensure bucket is public", "error", err, "bucket", bucketName)
+	}
+
+	_, err := r.minIO.PutObject(
+		context.Background(),
+		bucketName,
+		filename,
+		bytes.NewReader(previewBytes),
+		int64(len(previewBytes)),
+		minio.PutObjectOptions{
+			ContentType: "image/png",
+		},
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to upload preview to MinIO: %w", err)
+	}
+
+	slog.Info("Preview uploaded to MinIO", "filename", filename, "certificate_id", certificateID)
+	return filename, nil
+}
+
+// deleteOldPreviews removes all existing preview files for a certificate
+func (r *EmbeddedRenderer) deleteOldPreviews(bucketName, certificateID string) {
+	prefix := fmt.Sprintf("previews/%s/", certificateID)
+
+	objectCh := r.minIO.ListObjects(context.Background(), bucketName, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	})
+
+	deletedCount := 0
+	for object := range objectCh {
+		if object.Err != nil {
+			slog.Warn("Error listing preview objects", "error", object.Err, "cert_id", certificateID)
+			continue
+		}
+
+		err := r.minIO.RemoveObject(context.Background(), bucketName, object.Key, minio.RemoveObjectOptions{})
+		if err != nil {
+			slog.Warn("Failed to delete old preview", "error", err, "object", object.Key, "cert_id", certificateID)
+		} else {
+			deletedCount++
+			slog.Info("Deleted old preview", "object", object.Key, "cert_id", certificateID)
+		}
+	}
+
+	if deletedCount > 0 {
+		slog.Info("Cleaned up old previews", "count", deletedCount, "cert_id", certificateID)
+	}
+}
+
+// CleanupExpiredPreviews removes preview files older than the specified duration
+// This function should be called periodically (e.g., daily via cron job)
+func (r *EmbeddedRenderer) CleanupExpiredPreviews(maxAge time.Duration) error {
+	bucketName := *common.Config.BucketCertificate
+	prefix := "previews/"
+
+	slog.Info("Starting cleanup of expired preview images", "maxAge", maxAge.String())
+
+	objectCh := r.minIO.ListObjects(context.Background(), bucketName, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	})
+
+	deletedCount := 0
+	errorCount := 0
+	cutoffTime := time.Now().Add(-maxAge)
+
+	for object := range objectCh {
+		if object.Err != nil {
+			slog.Warn("Error listing preview objects during cleanup", "error", object.Err)
+			errorCount++
+			continue
+		}
+
+		// Check if the object is older than the cutoff time
+		if object.LastModified.Before(cutoffTime) {
+			err := r.minIO.RemoveObject(context.Background(), bucketName, object.Key, minio.RemoveObjectOptions{})
+			if err != nil {
+				slog.Warn("Failed to delete expired preview",
+					"error", err,
+					"object", object.Key,
+					"age", time.Since(object.LastModified).String())
+				errorCount++
+			} else {
+				deletedCount++
+				slog.Info("Deleted expired preview",
+					"object", object.Key,
+					"age", time.Since(object.LastModified).String())
+			}
+		}
+	}
+
+	slog.Info("Completed cleanup of expired preview images",
+		"deletedCount", deletedCount,
+		"errorCount", errorCount,
+		"maxAge", maxAge.String())
+
+	if errorCount > 0 {
+		return fmt.Errorf("cleanup completed with %d errors", errorCount)
+	}
+
+	return nil
+}
+
 func (r *EmbeddedRenderer) ProcessCertificates(ctx context.Context, certificate any, participants []any, signatures map[string]string) ([]CertificateResult, string, error) {
 	// Extract certificate ID
 	certMap, ok := certificate.(map[string]any)
