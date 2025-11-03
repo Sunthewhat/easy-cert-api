@@ -17,6 +17,9 @@ func SetupFileRoutes(app fiber.Router) {
 
 	// Get all files by type endpoint
 	fileGroup.Get("/:type", file.GetAllResourceByType)
+
+	// Delete resource endpoint
+	fileGroup.Delete("/:type", file.DeleteResource)
 }
 
 // SetupPublicFileRoutes configures public file download routes
