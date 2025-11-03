@@ -151,41 +151,137 @@ func SendSignatureRequestMail(signerEmail, signerName, certificateId, certificat
 	mailer := gomail.NewMessage()
 	mailer.SetHeader("From", *common.Config.MailUser)
 	mailer.SetHeader("To", signerEmail)
-	mailer.SetHeader("Subject", fmt.Sprintf("Signature Request for Certificate: %s", certificateName))
+	mailer.SetHeader("Subject", fmt.Sprintf("✍️ Signature Request - %s", certificateName))
 
-	// HTML email body with better formatting
 	htmlBody := fmt.Sprintf(`
 		<!DOCTYPE html>
 		<html>
 		<head>
+			<meta charset="UTF-8">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
 			<style>
-				body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-				.container { max-width: 600px; margin: 0 auto; padding: 20px; }
-				.header { background-color: #3b82f6; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-				.content { background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-				.certificate-name { font-weight: bold; color: #1f2937; font-size: 18px; margin: 15px 0; }
-				.button { display: inline-block; padding: 12px 30px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-				.button:hover { background-color: #2563eb; }
-				.footer { color: #6b7280; font-size: 14px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+				body {
+					font-family: 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+					line-height: 1.6;
+					margin: 0;
+					padding: 0;
+					background: linear-gradient(135deg, #e5e7eb 0%%, #d5d8de 100%%);
+				}
+				.container {
+					max-width: 600px;
+					margin: 40px auto;
+					background: rgba(255, 255, 255, 0.95);
+					border-radius: 28px;
+					border: 1px solid rgba(255, 255, 255, 0.6);
+					box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+					overflow: hidden;
+				}
+				.header {
+					background: linear-gradient(135deg, #244dad 0%%, #1e3d8f 100%%);
+					color: white;
+					padding: 48px 32px;
+					text-align: center;
+				}
+				.header h1 {
+					margin: 0;
+					font-size: 28px;
+					font-weight: 700;
+					letter-spacing: -0.02em;
+				}
+				.header p {
+					margin: 8px 0 0 0;
+					font-size: 15px;
+					opacity: 0.9;
+				}
+				.content {
+					padding: 40px 32px;
+				}
+				.greeting {
+					font-size: 18px;
+					font-weight: 600;
+					color: #1f2937;
+					margin-bottom: 16px;
+				}
+				.message {
+					font-size: 16px;
+					color: #374151;
+					margin-bottom: 24px;
+					line-height: 1.7;
+				}
+				.cert-card {
+					background: linear-gradient(135deg, rgba(229, 231, 235, 0.4) 0%%, rgba(255, 255, 255, 0.6) 100%%);
+					border: 1px solid rgba(36, 77, 173, 0.15);
+					border-radius: 20px;
+					padding: 24px;
+					margin: 28px 0;
+				}
+				.cert-name {
+					font-size: 20px;
+					font-weight: 700;
+					color: #244dad;
+					margin: 0;
+				}
+				.button {
+					display: inline-block;
+					background: #244dad;
+					color: white;
+					padding: 14px 32px;
+					border-radius: 100px;
+					text-decoration: none;
+					font-weight: 600;
+					font-size: 15px;
+					margin: 24px 0;
+					box-shadow: 0 10px 25px -5px rgba(36, 77, 173, 0.3);
+				}
+				.link-text {
+					font-size: 13px;
+					color: #6b7280;
+					word-break: break-all;
+					background: rgba(229, 231, 235, 0.5);
+					padding: 12px 16px;
+					border-radius: 8px;
+					margin: 16px 0;
+				}
+				.footer {
+					background: rgba(249, 250, 251, 0.8);
+					padding: 32px;
+					text-align: center;
+					font-size: 13px;
+					color: #9ca3af;
+					border-top: 1px solid rgba(229, 231, 235, 0.8);
+				}
+				.footer p {
+					margin: 8px 0;
+				}
 			</style>
 		</head>
 		<body>
 			<div class="container">
 				<div class="header">
-					<h2>Signature Request</h2>
+					<h1>✍️ Signature Request</h1>
+					<p>Your signature is needed</p>
 				</div>
 				<div class="content">
-					<p>Dear %s,</p>
-					<p>You have been requested to sign the following certificate:</p>
-					<div class="certificate-name">"%s"</div>
-					<p>Please click the button below to review and sign the certificate:</p>
-					<a href="%s" class="button">Sign Certificate</a>
-					<p>Or copy this link to your browser:</p>
-					<p style="word-break: break-all; color: #3b82f6;">%s</p>
-					<div class="footer">
-						<p>Best regards,<br>Easy Cert Team</p>
-						<p style="font-size: 12px; color: #9ca3af;">If you did not expect this email, please ignore it.</p>
+					<p class="greeting">Dear %s,</p>
+					<p class="message">
+						You have been requested to sign the following certificate. Your signature is an important part of this verification process.
+					</p>
+					<div class="cert-card">
+						<p class="cert-name">%s</p>
 					</div>
+					<p class="message">
+						Please click the button below to review and sign the certificate:
+					</p>
+					<center>
+						<a href="%s" class="button">Sign Certificate →</a>
+					</center>
+					<p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 16px;">Or copy this link to your browser:</p>
+					<div class="link-text">%s</div>
+				</div>
+				<div class="footer">
+					<p><strong>EasyCert</strong> - Secure Certificate Management</p>
+					<p style="margin-top: 12px;">If you did not expect this email, please ignore it.</p>
 				</div>
 			</div>
 		</body>
@@ -210,43 +306,148 @@ func SendSignatureReminderMail(signerEmail, signerName, certificateId, certifica
 	mailer := gomail.NewMessage()
 	mailer.SetHeader("From", *common.Config.MailUser)
 	mailer.SetHeader("To", signerEmail)
-	mailer.SetHeader("Subject", fmt.Sprintf("Reminder: Signature Request for Certificate: %s", certificateName))
+	mailer.SetHeader("Subject", fmt.Sprintf("🔔 Reminder: Signature Request - %s", certificateName))
 
-	// HTML email body with reminder emphasis
 	htmlBody := fmt.Sprintf(`
 		<!DOCTYPE html>
 		<html>
 		<head>
+			<meta charset="UTF-8">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
 			<style>
-				body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-				.container { max-width: 600px; margin: 0 auto; padding: 20px; }
-				.header { background-color: #f59e0b; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-				.content { background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-				.certificate-name { font-weight: bold; color: #1f2937; font-size: 18px; margin: 15px 0; }
-				.reminder-badge { background-color: #fef3c7; color: #92400e; padding: 8px 16px; border-radius: 5px; display: inline-block; margin: 10px 0; font-weight: bold; }
-				.button { display: inline-block; padding: 12px 30px; background-color: #f59e0b; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-				.button:hover { background-color: #d97706; }
-				.footer { color: #6b7280; font-size: 14px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+				body {
+					font-family: 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+					line-height: 1.6;
+					margin: 0;
+					padding: 0;
+					background: linear-gradient(135deg, #e5e7eb 0%%, #d5d8de 100%%);
+				}
+				.container {
+					max-width: 600px;
+					margin: 40px auto;
+					background: rgba(255, 255, 255, 0.95);
+					border-radius: 28px;
+					border: 1px solid rgba(255, 255, 255, 0.6);
+					box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+					overflow: hidden;
+				}
+				.header {
+					background: linear-gradient(135deg, #f59e0b 0%%, #d97706 100%%);
+					color: white;
+					padding: 48px 32px;
+					text-align: center;
+				}
+				.header h1 {
+					margin: 0;
+					font-size: 28px;
+					font-weight: 700;
+					letter-spacing: -0.02em;
+				}
+				.header p {
+					margin: 8px 0 0 0;
+					font-size: 15px;
+					opacity: 0.9;
+				}
+				.content {
+					padding: 40px 32px;
+				}
+				.reminder-badge {
+					background: linear-gradient(135deg, #fef3c7 0%%, #fde68a 100%%);
+					color: #92400e;
+					display: inline-block;
+					padding: 10px 20px;
+					border-radius: 100px;
+					font-size: 14px;
+					font-weight: 600;
+					margin-bottom: 24px;
+				}
+				.greeting {
+					font-size: 18px;
+					font-weight: 600;
+					color: #1f2937;
+					margin-bottom: 16px;
+				}
+				.message {
+					font-size: 16px;
+					color: #374151;
+					margin-bottom: 24px;
+					line-height: 1.7;
+				}
+				.cert-card {
+					background: linear-gradient(135deg, rgba(254, 243, 199, 0.3) 0%%, rgba(253, 230, 138, 0.2) 100%%);
+					border: 1px solid rgba(245, 158, 11, 0.2);
+					border-radius: 20px;
+					padding: 24px;
+					margin: 28px 0;
+				}
+				.cert-name {
+					font-size: 20px;
+					font-weight: 700;
+					color: #d97706;
+					margin: 0;
+				}
+				.button {
+					display: inline-block;
+					background: #f59e0b;
+					color: white;
+					padding: 14px 32px;
+					border-radius: 100px;
+					text-decoration: none;
+					font-weight: 600;
+					font-size: 15px;
+					margin: 24px 0;
+					box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.4);
+				}
+				.link-text {
+					font-size: 13px;
+					color: #6b7280;
+					word-break: break-all;
+					background: rgba(229, 231, 235, 0.5);
+					padding: 12px 16px;
+					border-radius: 8px;
+					margin: 16px 0;
+				}
+				.footer {
+					background: rgba(249, 250, 251, 0.8);
+					padding: 32px;
+					text-align: center;
+					font-size: 13px;
+					color: #9ca3af;
+					border-top: 1px solid rgba(229, 231, 235, 0.8);
+				}
+				.footer p {
+					margin: 8px 0;
+				}
 			</style>
 		</head>
 		<body>
 			<div class="container">
 				<div class="header">
-					<h2>🔔 Signature Reminder</h2>
+					<h1>🔔 Signature Reminder</h1>
+					<p>Your signature is still needed</p>
 				</div>
 				<div class="content">
-					<div class="reminder-badge">⏰ REMINDER</div>
-					<p>Dear %s,</p>
-					<p>This is a friendly reminder that you have a pending signature request for the following certificate:</p>
-					<div class="certificate-name">"%s"</div>
-					<p>Your signature is still needed. Please click the button below to review and sign the certificate:</p>
-					<a href="%s" class="button">Sign Certificate Now</a>
-					<p>Or copy this link to your browser:</p>
-					<p style="word-break: break-all; color: #f59e0b;">%s</p>
-					<div class="footer">
-						<p>Best regards,<br>Easy Cert Team</p>
-						<p style="font-size: 12px; color: #9ca3af;">You will continue to receive reminders until the certificate is signed. If you did not expect this email, please ignore it.</p>
+					<div class="reminder-badge">⏰ PENDING</div>
+					<p class="greeting">Dear %s,</p>
+					<p class="message">
+						This is a friendly reminder that you have a pending signature request for the following certificate. Your signature is important for completing this verification process.
+					</p>
+					<div class="cert-card">
+						<p class="cert-name">%s</p>
 					</div>
+					<p class="message">
+						Please take a moment to review and sign the certificate:
+					</p>
+					<center>
+						<a href="%s" class="button">Sign Certificate Now →</a>
+					</center>
+					<p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 16px;">Or copy this link to your browser:</p>
+					<div class="link-text">%s</div>
+				</div>
+				<div class="footer">
+					<p><strong>EasyCert</strong> - Secure Certificate Management</p>
+					<p style="margin-top: 12px;">You will receive reminders until the certificate is signed. If you did not expect this email, please ignore it.</p>
 				</div>
 			</div>
 		</body>
@@ -325,16 +526,16 @@ func SendAllSignaturesCompleteMail(ownerEmail, certificateName, certificateId, p
 	mailer := gomail.NewMessage()
 	mailer.SetHeader("From", *common.Config.MailUser)
 	mailer.SetHeader("To", ownerEmail)
-	mailer.SetHeader("Subject", fmt.Sprintf("All Signatures Complete - %s", certificateName))
+	mailer.SetHeader("Subject", fmt.Sprintf("✅ All Signatures Complete - %s", certificateName))
 
 	// Build HTML body with preview mention if preview is available
-	previewMessage := ""
+	previewSection := ""
 	if previewPath != "" {
-		previewMessage = `
-					<p class="message">
-						A preview of the signed certificate is attached to this email for your convenience.
-						Please note that the preview includes a watermark and is for reference only.
-					</p>`
+		previewSection = `
+					<div style="background: linear-gradient(135deg, rgba(36, 77, 173, 0.05) 0%, rgba(36, 77, 173, 0.02) 100%); border: 2px solid rgba(36, 77, 173, 0.1); border-radius: 16px; padding: 24px; margin: 24px 0; text-align: center;">
+						<p style="margin: 0 0 12px 0; font-size: 15px; color: #244dad; font-weight: 600;">📎 Preview Attached</p>
+						<p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">A preview of the signed certificate is attached to this email. Note: The preview includes a watermark and is for reference only.</p>
+					</div>`
 	}
 
 	htmlBody := fmt.Sprintf(`
@@ -343,110 +544,136 @@ func SendAllSignaturesCompleteMail(ownerEmail, certificateName, certificateId, p
 		<head>
 			<meta charset="UTF-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
 			<style>
 				body {
-					font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+					font-family: 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 					line-height: 1.6;
-					color: #333;
 					margin: 0;
 					padding: 0;
-					background-color: #f5f5f5;
+					background: linear-gradient(135deg, #e5e7eb 0%%, #d5d8de 100%%);
 				}
 				.container {
 					max-width: 600px;
 					margin: 40px auto;
-					background-color: #ffffff;
-					border-radius: 8px;
-					box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+					background: rgba(255, 255, 255, 0.95);
+					border-radius: 28px;
+					border: 1px solid rgba(255, 255, 255, 0.6);
+					box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 					overflow: hidden;
 				}
 				.header {
-					background: linear-gradient(135deg, #10b981 0%%, #059669 100%%);
+					background: linear-gradient(135deg, #244dad 0%%, #1e3d8f 100%%);
 					color: white;
-					padding: 40px 30px;
+					padding: 48px 32px;
 					text-align: center;
 				}
 				.header h1 {
 					margin: 0;
 					font-size: 28px;
-					font-weight: 600;
+					font-weight: 700;
+					letter-spacing: -0.02em;
+				}
+				.header p {
+					margin: 8px 0 0 0;
+					font-size: 15px;
+					opacity: 0.9;
 				}
 				.content {
-					padding: 40px 30px;
+					padding: 40px 32px;
 				}
-				.greeting {
-					font-size: 18px;
-					margin-bottom: 20px;
-					color: #111;
+				.success-badge {
+					background: linear-gradient(135deg, #10b981 0%%, #059669 100%%);
+					color: white;
+					display: inline-block;
+					padding: 10px 20px;
+					border-radius: 100px;
+					font-size: 14px;
+					font-weight: 600;
+					margin-bottom: 24px;
 				}
 				.message {
 					font-size: 16px;
-					color: #555;
-					margin-bottom: 30px;
-					line-height: 1.8;
+					color: #374151;
+					margin-bottom: 24px;
+					line-height: 1.7;
 				}
-				.certificate-info {
-					background-color: #f0fdf4;
-					border-left: 4px solid #10b981;
-					padding: 20px;
-					margin: 25px 0;
-					border-radius: 4px;
+				.cert-card {
+					background: linear-gradient(135deg, rgba(229, 231, 235, 0.4) 0%%, rgba(255, 255, 255, 0.6) 100%%);
+					border: 1px solid rgba(36, 77, 173, 0.15);
+					border-radius: 20px;
+					padding: 24px;
+					margin: 28px 0;
 				}
-				.certificate-name {
-					font-size: 18px;
-					font-weight: 600;
-					color: #059669;
-					margin-bottom: 8px;
+				.cert-name {
+					font-size: 20px;
+					font-weight: 700;
+					color: #244dad;
+					margin: 0 0 8px 0;
 				}
-				.certificate-id {
-					font-size: 14px;
+				.cert-id {
+					font-size: 13px;
 					color: #6b7280;
 					font-family: 'Courier New', monospace;
+					margin: 0;
 				}
-				.success-icon {
-					font-size: 48px;
-					text-align: center;
-					margin: 20px 0;
+				.button {
+					display: inline-block;
+					background: #244dad;
+					color: white;
+					padding: 14px 32px;
+					border-radius: 100px;
+					text-decoration: none;
+					font-weight: 600;
+					font-size: 15px;
+					margin: 24px 0;
+					box-shadow: 0 10px 25px -5px rgba(36, 77, 173, 0.3);
 				}
 				.footer {
-					background-color: #f9fafb;
-					padding: 30px;
+					background: rgba(249, 250, 251, 0.8);
+					padding: 32px;
 					text-align: center;
-					font-size: 14px;
-					color: #6b7280;
-					border-top: 1px solid #e5e7eb;
+					font-size: 13px;
+					color: #9ca3af;
+					border-top: 1px solid rgba(229, 231, 235, 0.8);
+				}
+				.footer p {
+					margin: 8px 0;
 				}
 			</style>
 		</head>
 		<body>
 			<div class="container">
 				<div class="header">
-					<h1>✅ All Signatures Complete!</h1>
+					<h1>✅ All Signatures Complete</h1>
+					<p>Your certificate is ready</p>
 				</div>
 				<div class="content">
-					<div class="success-icon">🎉</div>
-					<p class="greeting">Great news!</p>
+					<div class="success-badge">🎉 Signing Complete</div>
 					<p class="message">
-						All required signatures have been successfully collected for your certificate.
-						The signing process is now complete and your certificate is ready.
+						Great news! All required signatures have been successfully collected for your certificate.
+						The signing process is now complete.
 					</p>
-					<div class="certificate-info">
-						<div class="certificate-name">%s</div>
-						<div class="certificate-id">Certificate ID: %s</div>
+					<div class="cert-card">
+						<p class="cert-name">%s</p>
+						<p class="cert-id">ID: %s</p>
 					</div>
 					%s
 					<p class="message">
-						You can now view and distribute the fully signed certificate through your dashboard.
+						You can now generate and distribute the fully signed certificate through your EasyCert dashboard.
 					</p>
+					<center>
+						<a href="%s" class="button">View Dashboard →</a>
+					</center>
 				</div>
 				<div class="footer">
-					<p>This is an automated notification from the Secure Certificate System.</p>
-					<p>If you have any questions, please contact support.</p>
+					<p><strong>EasyCert</strong> - Secure Certificate Management</p>
+					<p style="margin-top: 12px;">This is an automated notification. Please do not reply to this email.</p>
 				</div>
 			</div>
 		</body>
 		</html>
-	`, certificateName, certificateId, previewMessage)
+	`, certificateName, certificateId, previewSection, *common.Config.VerifyHost)
 
 	mailer.SetBody("text/html", htmlBody)
 
