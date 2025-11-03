@@ -151,7 +151,7 @@ func SendSignatureRequestMail(signerEmail, signerName, certificateId, certificat
 	mailer := gomail.NewMessage()
 	mailer.SetHeader("From", *common.Config.MailUser)
 	mailer.SetHeader("To", signerEmail)
-	mailer.SetHeader("Subject", fmt.Sprintf("✍️ Signature Request - %s", certificateName))
+	mailer.SetHeader("Subject", fmt.Sprintf("Signature Request - %s", certificateName))
 
 	htmlBody := fmt.Sprintf(`
 		<!DOCTYPE html>
@@ -259,7 +259,7 @@ func SendSignatureRequestMail(signerEmail, signerName, certificateId, certificat
 		<body>
 			<div class="container">
 				<div class="header">
-					<h1>✍️ Signature Request</h1>
+					<h1>Signature Request</h1>
 					<p>Your signature is needed</p>
 				</div>
 				<div class="content">
@@ -306,7 +306,7 @@ func SendSignatureReminderMail(signerEmail, signerName, certificateId, certifica
 	mailer := gomail.NewMessage()
 	mailer.SetHeader("From", *common.Config.MailUser)
 	mailer.SetHeader("To", signerEmail)
-	mailer.SetHeader("Subject", fmt.Sprintf("🔔 Reminder: Signature Request - %s", certificateName))
+	mailer.SetHeader("Subject", fmt.Sprintf("Reminder: Signature Request - %s", certificateName))
 
 	htmlBody := fmt.Sprintf(`
 		<!DOCTYPE html>
@@ -424,11 +424,11 @@ func SendSignatureReminderMail(signerEmail, signerName, certificateId, certifica
 		<body>
 			<div class="container">
 				<div class="header">
-					<h1>🔔 Signature Reminder</h1>
+					<h1>Signature Reminder</h1>
 					<p>Your signature is still needed</p>
 				</div>
 				<div class="content">
-					<div class="reminder-badge">⏰ PENDING</div>
+					<div class="reminder-badge">PENDING</div>
 					<p class="greeting">Dear %s,</p>
 					<p class="message">
 						This is a friendly reminder that you have a pending signature request for the following certificate. Your signature is important for completing this verification process.
@@ -526,14 +526,14 @@ func SendAllSignaturesCompleteMail(ownerEmail, certificateName, certificateId, p
 	mailer := gomail.NewMessage()
 	mailer.SetHeader("From", *common.Config.MailUser)
 	mailer.SetHeader("To", ownerEmail)
-	mailer.SetHeader("Subject", fmt.Sprintf("✅ All Signatures Complete - %s", certificateName))
+	mailer.SetHeader("Subject", fmt.Sprintf("All Signatures Complete - %s", certificateName))
 
 	// Build HTML body with preview mention if preview is available
 	previewSection := ""
 	if previewPath != "" {
 		previewSection = `
 					<div style="background: linear-gradient(135deg, rgba(36, 77, 173, 0.05) 0%, rgba(36, 77, 173, 0.02) 100%); border: 2px solid rgba(36, 77, 173, 0.1); border-radius: 16px; padding: 24px; margin: 24px 0; text-align: center;">
-						<p style="margin: 0 0 12px 0; font-size: 15px; color: #244dad; font-weight: 600;">📎 Preview Attached</p>
+						<p style="margin: 0 0 12px 0; font-size: 15px; color: #244dad; font-weight: 600;">Preview Attached</p>
 						<p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">A preview of the signed certificate is attached to this email. Note: The preview includes a watermark and is for reference only.</p>
 					</div>`
 	}
@@ -645,11 +645,11 @@ func SendAllSignaturesCompleteMail(ownerEmail, certificateName, certificateId, p
 		<body>
 			<div class="container">
 				<div class="header">
-					<h1>✅ All Signatures Complete</h1>
+					<h1>All Signatures Complete</h1>
 					<p>Your certificate is ready</p>
 				</div>
 				<div class="content">
-					<div class="success-badge">🎉 Signing Complete</div>
+					<div class="success-badge">Signing Complete</div>
 					<p class="message">
 						Great news! All required signatures have been successfully collected for your certificate.
 						The signing process is now complete.
