@@ -5,11 +5,10 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func GetByUser(c *fiber.Ctx) error {
+func (ctrl *CertificateController) GetByUser(c *fiber.Ctx) error {
 	userId, success := middleware.GetUserFromContext(c)
 
 	if !success {
@@ -17,7 +16,7 @@ func GetByUser(c *fiber.Ctx) error {
 		return response.SendUnauthorized(c, "User token not found")
 	}
 
-	certificates, err := certificatemodel.GetByUser(userId)
+	certificates, err := ctrl.certRepo.GetByUser(userId)
 
 	if err != nil {
 		slog.Error("Certificate GetAll controller failed", "error", err)

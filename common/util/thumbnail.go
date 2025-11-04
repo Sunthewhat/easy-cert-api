@@ -52,7 +52,8 @@ func RenderCertificateThumbnail(certificate *model.Certificate) error {
 
 	// Generate presigned URL for thumbnail access
 	thumbnailURL := embeddedRenderer.GenerateAccessibleURL(*common.Config.BucketCertificate, thumbnailPath)
-	err = certificatemodel.AddThumbnailUrl(certificate.ID, thumbnailURL)
+	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
+	err = certRepo.AddThumbnailUrl(certificate.ID, thumbnailURL)
 	if err != nil {
 		slog.Error("Failed to update certificate thumbnail URL", "error", err, "cert_id", certificate.ID, "thumbnail_path", thumbnailPath)
 		return fmt.Errorf("failed to update thumbnail URL: %w", err)

@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
+	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -21,7 +22,8 @@ func Add(c *fiber.Ctx) error {
 	}
 
 	// First verify that the certificate exists
-	cert, err := certificatemodel.GetById(certId)
+	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
+	cert, err := certRepo.GetById(certId)
 	if err != nil {
 		slog.Error("Participant Add certificate verification failed", "error", err, "cert_id", certId)
 		return response.SendInternalError(c, err)

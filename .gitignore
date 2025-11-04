@@ -5,3 +5,4 @@ node_modules
 .gen*
 signing*.pem
 easy-cert-api
+coverage.out

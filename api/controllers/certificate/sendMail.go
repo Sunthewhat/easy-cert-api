@@ -4,13 +4,12 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func DistributeByMail(c *fiber.Ctx) error {
+func (ctrl *CertificateController) DistributeByMail(c *fiber.Ctx) error {
 	certId := c.Params("certId")
 	emailField := c.Query("email")
 
@@ -18,7 +17,7 @@ func DistributeByMail(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Missing email field")
 	}
 
-	cert, err := certificatemodel.GetById(certId)
+	cert, err := ctrl.certRepo.GetById(certId)
 	if err != nil {
 		slog.Error("Certificate Controller Distribute by Mail Error", "error", err)
 		return response.SendInternalError(c, err)

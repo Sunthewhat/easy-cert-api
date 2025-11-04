@@ -183,7 +183,8 @@ func GetExistingParticipantFields(certId string) ([]string, error) {
 // ValidateFieldConsistency checks if new participant fields match certificate design anchors
 func ValidateFieldConsistency(certId string, newParticipants []map[string]any) error {
 	// Get certificate design to extract required anchor fields
-	cert, err := certificatemodel.GetById(certId)
+	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
+	cert, err := certRepo.GetById(certId)
 	if err != nil {
 		return fmt.Errorf("failed to get certificate: %w", err)
 	}
@@ -318,7 +319,8 @@ func DeleteCollectionByCertIdFromMongo(certId string) error {
 // validateEditDataStructure validates that new data matches the certificate design anchors
 func validateEditDataStructure(certId string, newData map[string]any) error {
 	// Get certificate design to validate against current anchors
-	cert, err := certificatemodel.GetById(certId)
+	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
+	cert, err := certRepo.GetById(certId)
 	if err != nil {
 		return fmt.Errorf("failed to get certificate: %w", err)
 	}

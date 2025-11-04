@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
+	"github.com/sunthewhat/easy-cert-api/common"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
@@ -26,7 +27,8 @@ func RequestResign(c *fiber.Ctx) error {
 		return response.SendInternalError(c, err)
 	}
 
-	cert, err := certificatemodel.GetById(signature.CertificateID)
+	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
+	cert, err := certRepo.GetById(signature.CertificateID)
 
 	if err != nil {
 		return response.SendInternalError(c, err)

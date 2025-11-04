@@ -6,11 +6,10 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func GetAnchorList(c *fiber.Ctx) error {
+func (ctrl *CertificateController) GetAnchorList(c *fiber.Ctx) error {
 	certId := c.Params("certId")
 
 	if certId == "" {
@@ -18,7 +17,7 @@ func GetAnchorList(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Certificate ID is required")
 	}
 
-	cert, err := certificatemodel.GetById(certId)
+	cert, err := ctrl.certRepo.GetById(certId)
 
 	if err != nil {
 		slog.Error("Error getting certificate", "certId", certId, "error", err)

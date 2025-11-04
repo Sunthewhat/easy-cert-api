@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
+	"github.com/sunthewhat/easy-cert-api/common"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -29,7 +30,8 @@ func GetStatus(c *fiber.Ctx) error {
 
 	certId := c.Params("certId")
 
-	cert, err := certificatemodel.GetById(certId)
+	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
+	cert, err := certRepo.GetById(certId)
 
 	if err != nil {
 		return response.SendInternalError(c, err)

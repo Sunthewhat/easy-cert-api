@@ -2,6 +2,7 @@ package file
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -67,7 +68,7 @@ func DownloadFile(c *fiber.Ctx) error {
 
 	// Set response headers
 	c.Set("Content-Type", contentType)
-	c.Set("Content-Length", string(objectInfo.Size))
+	c.Set("Content-Length", fmt.Sprintf("%d", objectInfo.Size))
 	c.Set("Content-Disposition", "inline") // Display in browser instead of forcing download
 
 	// Stream the file to the response

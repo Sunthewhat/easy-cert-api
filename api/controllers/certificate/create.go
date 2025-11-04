@@ -5,13 +5,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func Create(c *fiber.Ctx) error {
+func (ctrl *CertificateController) Create(c *fiber.Ctx) error {
 	body := new(payload.CreateCertificatePayload)
 
 	if err := c.BodyParser(body); err != nil {
@@ -30,7 +29,7 @@ func Create(c *fiber.Ctx) error {
 		return response.SendError(c, "Failed to read user")
 	}
 
-	newCert, err := certificatemodel.Create(*body, userId)
+	newCert, err := ctrl.certRepo.Create(*body, userId)
 
 	if err != nil {
 		return response.SendInternalError(c, err)

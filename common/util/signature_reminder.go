@@ -7,6 +7,7 @@ import (
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
+	"github.com/sunthewhat/easy-cert-api/common"
 )
 
 // StartSignatureReminderJob starts a background job that sends daily reminder emails
@@ -72,7 +73,8 @@ func SendSignatureReminders() {
 		}
 
 		// Get certificate details
-		certificate, err := certificatemodel.GetById(signature.CertificateID)
+		certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
+		certificate, err := certRepo.GetById(signature.CertificateID)
 		if err != nil {
 			slog.Error("SendSignatureReminders: Error getting certificate", "error", err, "certificateId", signature.CertificateID)
 			failedCount++

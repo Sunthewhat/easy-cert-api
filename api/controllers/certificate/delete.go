@@ -4,13 +4,12 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func Delete(c *fiber.Ctx) error {
+func (ctrl *CertificateController) Delete(c *fiber.Ctx) error {
 	certId := c.Params("certId")
 
 	if certId == "" {
@@ -18,7 +17,7 @@ func Delete(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Certificate ID is required")
 	}
 
-	cert, err := certificatemodel.GetById(certId)
+	cert, err := ctrl.certRepo.GetById(certId)
 
 	if err != nil {
 		slog.Error("Error getting certificate", "certId", certId)
@@ -45,7 +44,7 @@ func Delete(c *fiber.Ctx) error {
 	}
 	slog.Info("Deleted signatures for certificate", "certId", certId, "count", len(signatures))
 
-	deletedCert, err := certificatemodel.Delete(certId)
+	deletedCert, err := ctrl.certRepo.Delete(certId)
 
 	if err != nil {
 		slog.Error("Certificate Delete controller failed", "error", err, "cert_id", certId)

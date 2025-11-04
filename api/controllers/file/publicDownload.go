@@ -2,6 +2,7 @@ package file
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -119,7 +120,7 @@ func PublicDownloadCertificate(c *fiber.Ctx) error {
 
 	// Set response headers - force download
 	c.Set("Content-Type", contentType)
-	c.Set("Content-Length", string(objectInfo.Size))
+	c.Set("Content-Length", fmt.Sprintf("%d", objectInfo.Size))
 	c.Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
 
 	// Mark as downloaded if this is the first download

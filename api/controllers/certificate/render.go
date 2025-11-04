@@ -10,7 +10,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/common"
@@ -19,7 +18,7 @@ import (
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func Render(c *fiber.Ctx) error {
+func (ctrl *CertificateController) Render(c *fiber.Ctx) error {
 	certId := c.Params("certId")
 
 	isRenewAll := c.Query("renew") // "true", "false", ""
@@ -30,7 +29,7 @@ func Render(c *fiber.Ctx) error {
 	}
 
 	// Get certificate data
-	cert, err := certificatemodel.GetById(certId)
+	cert, err := ctrl.certRepo.GetById(certId)
 	if err != nil {
 		slog.Error("Certificate Render GetById failed", "error", err, "cert_id", certId)
 		return response.SendInternalError(c, err)
@@ -42,7 +41,7 @@ func Render(c *fiber.Ctx) error {
 	}
 
 	if !cert.IsDistributed {
-		err := certificatemodel.MarkAsDistributed(certId)
+		err := ctrl.certRepo.MarkAsDistributed(certId)
 		if err != nil {
 			return response.SendInternalError(c, err)
 		}
@@ -239,7 +238,7 @@ func Render(c *fiber.Ctx) error {
 	if zipFilePath != "" {
 		// Use backend proxy URL instead of direct MinIO URL for security
 		archiveURL := util.GenerateProxyURL(*common.Config.BucketCertificate, zipFilePath)
-		certificatemodel.EditArchiveUrl(certId, archiveURL)
+		ctrl.certRepo.EditArchiveUrl(certId, archiveURL)
 		slog.Info("Updated certificate archive URL", "cert_id", certId, "zip_path", zipFilePath, "url", archiveURL)
 	}
 
