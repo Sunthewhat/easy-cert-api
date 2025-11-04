@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/sunthewhat/easy-cert-api/api/middleware"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -15,6 +16,12 @@ func DeleteResource(c *fiber.Ctx) error {
 
 	if resourceType != "background" && resourceType != "graphic" {
 		return response.SendFailed(c, "Invalid resource type")
+	}
+
+	// Get user ID from context (set by AuthMiddleware)
+	userId, ok := middleware.GetUserFromContext(c)
+	if !ok {
+		return response.SendUnauthorized(c, "User not authenticated")
 	}
 
 	// Get the file URL or object name from request body
@@ -48,8 +55,16 @@ func DeleteResource(c *fiber.Ctx) error {
 		objectName = req.ObjectName
 	}
 
-	// Validate that the object name starts with the correct resource type
-	if !strings.HasPrefix(objectName, resourceType) {
+	// Validate that the object name starts with userId (security check)
+	if !strings.HasPrefix(objectName, userId+"/") {
+		return response.SendFailed(c, "Access denied: You can only delete your own resources")
+	}
+
+	// Extract the filename part after userId/
+	filenamePart := strings.TrimPrefix(objectName, userId+"/")
+
+	// Validate that the filename starts with the correct resource type
+	if !strings.HasPrefix(filenamePart, resourceType) {
 		return response.SendFailed(c, "Object does not match the specified resource type")
 	}
 

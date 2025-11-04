@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/sunthewhat/easy-cert-api/api/middleware"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -19,6 +20,13 @@ func UploadResource(c *fiber.Ctx) error {
 	if resourceType != "background" && resourceType != "graphic" {
 		return response.SendFailed(c, "Invalid resource type")
 	}
+
+	// Get user ID from context (set by AuthMiddleware)
+	userId, ok := middleware.GetUserFromContext(c)
+	if !ok {
+		return response.SendUnauthorized(c, "User not authenticated")
+	}
+
 	file, err := c.FormFile("image")
 
 	if err != nil {
@@ -32,7 +40,9 @@ func UploadResource(c *fiber.Ctx) error {
 	ext := filepath.Ext(file.Filename)
 	uniqueID := uuid.New().String()
 	timeStamp := time.Now().Unix()
-	objName := fmt.Sprintf("%s_%d_%s%s", resourceType, timeStamp, uniqueID, ext)
+
+	// Include userId in the object path: userId/resourceType_timestamp_uuid.ext
+	objName := fmt.Sprintf("%s/%s_%d_%s%s", userId, resourceType, timeStamp, uniqueID, ext)
 
 	ctx := context.Background()
 

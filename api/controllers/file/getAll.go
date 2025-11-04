@@ -2,8 +2,10 @@ package file
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/sunthewhat/easy-cert-api/api/middleware"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -16,10 +18,17 @@ func GetAllResourceByType(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Invalid resource type")
 	}
 
+	// Get user ID from context (set by AuthMiddleware)
+	userId, ok := middleware.GetUserFromContext(c)
+	if !ok {
+		return response.SendUnauthorized(c, "User not authenticated")
+	}
+
 	ctx := context.Background()
 
-	// Get direct MinIO URLs first
-	minioURLs, err := util.ListFilesByPrefix(ctx, *common.Config.BucketResource, resourceType, 0)
+	// List files with prefix userId/resourceType to get only user's files
+	prefix := fmt.Sprintf("%s/%s", userId, resourceType)
+	minioURLs, err := util.ListFilesByPrefix(ctx, *common.Config.BucketResource, prefix, 0)
 	if err != nil {
 		return response.SendInternalError(c, err)
 	}
