@@ -7,7 +7,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
@@ -66,7 +65,7 @@ func stringSliceDifference(a, b []string) []string {
 	return diff
 }
 
-func Update(c *fiber.Ctx) error {
+func (ctrl *CertificateController) Update(c *fiber.Ctx) error {
 	// Get certificate ID from URL parameter
 	id := c.Params("id")
 	if id == "" {
@@ -95,7 +94,7 @@ func Update(c *fiber.Ctx) error {
 	}
 
 	// Update certificate
-	updatedCert, updateErr := certificatemodel.Update(id, body.Name, body.Design)
+	updatedCert, updateErr := ctrl.certRepo.Update(id, body.Name, body.Design)
 	if updateErr != nil {
 		if updateErr.Error() == "certificate not found" {
 			slog.Warn("Certificate Update attempt with non-existent ID", "cert_id", id)
@@ -151,7 +150,7 @@ func Update(c *fiber.Ctx) error {
 						slog.Warn("Certificate Update: Failed to create new signatures", "error", createErr, "cert_id", id)
 					} else {
 						// Mark certificate as unsigned since new signatures were added
-						markErr := certificatemodel.MarkAsUnsigned(id)
+						markErr := ctrl.certRepo.MarkAsUnsigned(id)
 						if markErr != nil {
 							slog.Warn("Certificate Update: Failed to mark certificate as unsigned", "error", markErr, "cert_id", id)
 						}
@@ -182,7 +181,7 @@ func Update(c *fiber.Ctx) error {
 						// All remaining signatures are signed, mark certificate as signed and notify owner
 						slog.Info("Certificate Update: All remaining signatures are complete after removal", "cert_id", id)
 
-						markErr := certificatemodel.MarkAsSigned(id)
+						markErr := ctrl.certRepo.MarkAsSigned(id)
 						if markErr != nil {
 							slog.Warn("Certificate Update: Failed to mark certificate as signed", "error", markErr, "cert_id", id)
 						}
@@ -195,7 +194,7 @@ func Update(c *fiber.Ctx) error {
 						}
 					} else {
 						// Not all signatures complete, ensure certificate is marked as unsigned
-						markErr := certificatemodel.MarkAsUnsigned(id)
+						markErr := ctrl.certRepo.MarkAsUnsigned(id)
 						if markErr != nil {
 							slog.Warn("Certificate Update: Failed to mark certificate as unsigned", "error", markErr, "cert_id", id)
 						}

@@ -62,60 +62,6 @@ func AuthMiddleware() fiber.Handler {
 	}
 }
 
-// OptionalAuthMiddleware - JWT authentication middleware that doesn't block unauthenticated requests
-// Sets user context if valid token is provided, but allows requests to continue without authentication
-func OptionalAuthMiddleware() fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		authHeader := c.Get("Authorization")
-
-		// No auth header - continue as unauthenticated user
-		if authHeader == "" {
-			c.Locals("is_authenticated", false)
-			slog.Debug("OptionalAuthMiddleware: no auth header, continuing as unauthenticated",
-				"path", c.Path(),
-				"method", c.Method())
-			return c.Next()
-		}
-
-		// Try to parse token
-		tokenParts := strings.Split(authHeader, " ")
-		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			c.Locals("is_authenticated", false)
-			slog.Debug("OptionalAuthMiddleware: invalid auth header format, continuing as unauthenticated",
-				"path", c.Path(),
-				"method", c.Method())
-			return c.Next()
-		}
-
-		token := tokenParts[1]
-		claims, err := util.DecodeAuthToken(token)
-		if err != nil {
-			c.Locals("is_authenticated", false)
-			slog.Debug("OptionalAuthMiddleware: invalid token, continuing as unauthenticated",
-				"error", err,
-				"path", c.Path(),
-				"method", c.Method())
-			return c.Next()
-		}
-
-		// Valid token - set user context
-		if claims.UserId != nil && *claims.UserId != "" {
-			c.Locals("user_id", *claims.UserId)
-			c.Locals("jwt_claims", claims)
-			c.Locals("is_authenticated", true)
-
-			slog.Info("OptionalAuthMiddleware: authentication successful",
-				"user_id", *claims.UserId,
-				"path", c.Path(),
-				"method", c.Method())
-		} else {
-			c.Locals("is_authenticated", false)
-		}
-
-		return c.Next()
-	}
-}
-
 // GetUserFromContext - Helper function to extract user ID from request context
 func GetUserFromContext(c *fiber.Ctx) (string, bool) {
 	if userID := c.Locals("user_id"); userID != nil {

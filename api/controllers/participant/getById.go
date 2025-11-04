@@ -1,6 +1,7 @@
 package participant_controller
 
 import (
+	"github.com/sunthewhat/easy-cert-api/common"
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
@@ -22,7 +23,8 @@ func GetValidationDataByParticipantId(c *fiber.Ctx) error {
 		return response.SendInternalError(c, err)
 	}
 
-	certificate, err := certificatemodel.GetById(participant.CertificateID)
+	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
+	certificate, err := certRepo.GetById(participant.CertificateID)
 	if err != nil {
 		return response.SendInternalError(c, err)
 	}

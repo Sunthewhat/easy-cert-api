@@ -1,6 +1,7 @@
 package participant_controller
 
 import (
+	"github.com/sunthewhat/easy-cert-api/common"
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
@@ -17,7 +18,8 @@ func GetByCert(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Certificate ID is required")
 	}
 
-	cert, err := certificatemodel.GetById(certId)
+	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
+	cert, err := certRepo.GetById(certId)
 
 	if err != nil {
 		slog.Error("Get Participant by ID failed", "error", err, "certId", certId)

@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -16,10 +15,10 @@ type responseStruct struct {
 	IsPartialGenerated bool `json:"is_partial_generated"`
 }
 
-func CheckGenerateStatus(c *fiber.Ctx) error {
+func (ctrl *CertificateController) CheckGenerateStatus(c *fiber.Ctx) error {
 	certificateId := c.Params("certificateId")
 
-	cert, err := certificatemodel.GetById(certificateId)
+	cert, err := ctrl.certRepo.GetById(certificateId)
 
 	if err != nil {
 		slog.Error("Error getting certificate in Check Distribute Status controller", "error", err, "certId", certificateId)
