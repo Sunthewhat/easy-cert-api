@@ -12,7 +12,20 @@ import (
 	"github.com/sunthewhat/easy-cert-api/type/shared"
 )
 
-func LoginSSO(username string, password string) (*shared.SsoTokenType, error) {
+type ISSOService interface {
+	Login(username string, password string) (*shared.SsoTokenType, error)
+	Refresh(token string) (*shared.SsoTokenType, error)
+	Verify(token string) (*shared.SsoVerifyType, error)
+	Decode(token string) (*shared.SsoJwtPayload, error)
+}
+
+type SSOService struct{}
+
+func NewSSOService() ISSOService {
+	return &SSOService{}
+}
+
+func (s *SSOService) Login(username string, password string) (*shared.SsoTokenType, error) {
 	tokenURL := fmt.Sprintf("%s/protocol/openid-connect/token", *common.Config.SsoIssuerUrl)
 
 	data := url.Values{}
@@ -49,7 +62,7 @@ func LoginSSO(username string, password string) (*shared.SsoTokenType, error) {
 	return &ssoResponse, nil
 }
 
-func RefreshSSO(token string) (*shared.SsoTokenType, error) {
+func (s *SSOService) Refresh(token string) (*shared.SsoTokenType, error) {
 	tokenURL := fmt.Sprintf("%s/protocol/openid-connect/token", *common.Config.SsoIssuerUrl)
 
 	data := url.Values{}
@@ -84,7 +97,7 @@ func RefreshSSO(token string) (*shared.SsoTokenType, error) {
 	return &ssoResponse, nil
 }
 
-func VerifySSO(token string) (*shared.SsoVerifyType, error) {
+func (s *SSOService) Verify(token string) (*shared.SsoVerifyType, error) {
 	verifyURL := fmt.Sprintf("%s/protocol/openid-connect/token/introspect", *common.Config.SsoIssuerUrl)
 
 	data := url.Values{}
@@ -115,7 +128,7 @@ func VerifySSO(token string) (*shared.SsoVerifyType, error) {
 	return &verifyResponse, nil
 }
 
-func DecodeJWTToken(token string) (*shared.SsoJwtPayload, error) {
+func (s *SSOService) Decode(token string) (*shared.SsoJwtPayload, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("invalid JWT token format")

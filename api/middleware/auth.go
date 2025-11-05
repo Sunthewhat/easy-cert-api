@@ -10,7 +10,7 @@ import (
 )
 
 // AuthMiddleware - Complete JWT authentication middleware
-func AuthMiddleware() fiber.Handler {
+func AuthMiddleware(ssoService util.ISSOService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Get Authorization header
 		authHeader := c.Get("Authorization")
@@ -35,13 +35,13 @@ func AuthMiddleware() fiber.Handler {
 
 		token := tokenParts[1]
 
-		newToken, err := util.RefreshSSO(token)
+		newToken, err := ssoService.Refresh(token)
 		if err != nil {
 			slog.Error("Refresh token failed", "error", err)
 			return response.SendUnauthorized(c, err.Error())
 		}
 
-		jwtPayload, err := util.DecodeJWTToken(newToken.AccessToken)
+		jwtPayload, err := ssoService.Decode(newToken.AccessToken)
 		if err != nil {
 			slog.Error("Failed to decode JWT token from refreshed token", "errror", err)
 		}
@@ -70,14 +70,4 @@ func GetUserFromContext(c *fiber.Ctx) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-// IsAuthenticated - Helper function to check if user is authenticated
-func IsAuthenticated(c *fiber.Ctx) bool {
-	if auth := c.Locals("is_authenticated"); auth != nil {
-		if isAuth, ok := auth.(bool); ok {
-			return isAuth
-		}
-	}
-	return false
 }

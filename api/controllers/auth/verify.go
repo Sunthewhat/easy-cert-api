@@ -8,7 +8,7 @@ import (
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func Verify(c *fiber.Ctx) error {
+func (ac *AuthController) Verify(c *fiber.Ctx) error {
 	userId, success := middleware.GetUserFromContext(c)
 	if !success {
 		slog.Error("Get user from context failed")

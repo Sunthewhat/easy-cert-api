@@ -9,7 +9,7 @@ import (
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func Login(c *fiber.Ctx) error {
+func (ac *AuthController) Login(c *fiber.Ctx) error {
 	body := new(payload.LoginPayload)
 
 	if err := c.BodyParser(body); err != nil {
@@ -21,7 +21,7 @@ func Login(c *fiber.Ctx) error {
 		return response.SendFailed(c, errors[0]) // Return first validation error
 	}
 
-	ssoResponse, err := util.LoginSSO(body.Username, body.Password)
+	ssoResponse, err := ac.ssoService.Login(body.Username, body.Password)
 
 	if err != nil {
 		slog.Error("SSO login Failed")
@@ -29,7 +29,7 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	// Decode the JWT access token
-	jwtPayload, err := util.DecodeJWTToken(ssoResponse.AccessToken)
+	jwtPayload, err := ac.ssoService.Decode(ssoResponse.AccessToken)
 	if err != nil {
 		slog.Error("Failed to decode JWT token", "error", err)
 		return response.SendInternalError(c, err)
