@@ -33,4 +33,5 @@ func SetupCertificateRoutes(router fiber.Router) {
 	certificateGroup.Post("mail/resend/:participantId", certCtrl.ResendParticipantMail)
 	certificateGroup.Get("anchor/:certId", certCtrl.GetAnchorList)
 	certificateGroup.Get("generate/status/:certificateId", certCtrl.CheckGenerateStatus)
+	certificateGroup.Get("archive/:certId", certCtrl.DownloadArchive)
 }
