@@ -8,16 +8,16 @@ import (
 
 // CertificateController handles certificate-related HTTP requests
 type CertificateController struct {
-	certRepo        *certificatemodel.CertificateRepository
-	signatureRepo   *signaturemodel.SignatureRepository
-	participantRepo *participantmodel.ParticipantRepository
+	certRepo        certificatemodel.ICertificateRepository
+	signatureRepo   signaturemodel.ISignatureRepository
+	participantRepo participantmodel.IParticipantRepository
 }
 
 // NewCertificateController creates a new certificate controller with injected dependencies
 func NewCertificateController(
-	certRepo *certificatemodel.CertificateRepository,
-	signatureRepo *signaturemodel.SignatureRepository,
-	participantRepo *participantmodel.ParticipantRepository,
+	certRepo certificatemodel.ICertificateRepository,
+	signatureRepo signaturemodel.ISignatureRepository,
+	participantRepo participantmodel.IParticipantRepository,
 ) *CertificateController {
 	return &CertificateController{
 		certRepo:        certRepo,

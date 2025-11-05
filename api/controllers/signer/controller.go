@@ -8,16 +8,16 @@ import (
 
 // SignerController handles signer-related HTTP requests
 type SignerController struct {
-	signerRepo      *signermodel.SignerRepository
-	signatureRepo   *signaturemodel.SignatureRepository
-	certificateRepo *certificatemodel.CertificateRepository
+	signerRepo      signermodel.ISignerRepository
+	signatureRepo   signaturemodel.ISignatureRepository
+	certificateRepo certificatemodel.ICertificateRepository
 }
 
 // NewSignerController creates a new signer controller with injected dependencies
 func NewSignerController(
-	signerRepo *signermodel.SignerRepository,
-	signatureRepo *signaturemodel.SignatureRepository,
-	certificateRepo *certificatemodel.CertificateRepository,
+	signerRepo signermodel.ISignerRepository,
+	signatureRepo signaturemodel.ISignatureRepository,
+	certificateRepo certificatemodel.ICertificateRepository,
 ) *SignerController {
 	return &SignerController{
 		signerRepo:      signerRepo,
