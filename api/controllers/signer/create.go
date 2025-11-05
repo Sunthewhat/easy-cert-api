@@ -5,13 +5,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
-	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func Create(c *fiber.Ctx) error {
+func (ctrl *SignerController) Create(c *fiber.Ctx) error {
 	body := new(payload.CreateSignerPayload)
 
 	if err := c.BodyParser(body); err != nil {
@@ -30,7 +29,7 @@ func Create(c *fiber.Ctx) error {
 		return response.SendUnauthorized(c, "Invalid token context")
 	}
 
-	isEmailExisted, err := signermodel.IsEmailExisted(body.Email)
+	isEmailExisted, err := ctrl.signerRepo.IsEmailExisted(body.Email)
 
 	if err != nil {
 		return response.SendInternalError(c, err)
@@ -40,7 +39,7 @@ func Create(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Signer with this email already existed")
 	}
 
-	newSigner, err := signermodel.Create(*body, userId)
+	newSigner, err := ctrl.signerRepo.Create(*body, userId)
 
 	if err != nil {
 		return response.SendInternalError(c, err)

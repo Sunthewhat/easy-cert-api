@@ -5,20 +5,35 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/shared/model"
+	"github.com/sunthewhat/easy-cert-api/type/shared/query"
 	"gorm.io/gorm"
 )
 
-func Create(signatureData payload.CreateSignaturePayload, userId string) (*model.Signature, error) {
+// SignatureRepository handles all signature database operations
+type SignatureRepository struct {
+	q *query.Query
+}
+
+// NewSignatureRepository creates a new signature repository with dependency injection
+func NewSignatureRepository(q *query.Query) *SignatureRepository {
+	return &SignatureRepository{q: q}
+}
+
+// ============================================================================
+// Repository Methods (Instance methods for dependency injection)
+// ============================================================================
+
+// Create creates a new signature
+func (r *SignatureRepository) Create(signatureData payload.CreateSignaturePayload, userId string) (*model.Signature, error) {
 	signature := &model.Signature{
 		SignerID:      signatureData.SignerId,
 		CertificateID: signatureData.CertificateId,
 		CreatedBy:     userId,
 	}
 
-	createErr := common.Gorm.Signature.Create(signature)
+	createErr := r.q.Signature.Create(signature)
 
 	if createErr != nil {
 		slog.Error("Create Signature Error", "error", createErr, "data", signatureData, "userId", userId)
@@ -28,8 +43,9 @@ func Create(signatureData payload.CreateSignaturePayload, userId string) (*model
 	return signature, nil
 }
 
-func GetById(signatureId string) (*model.Signature, error) {
-	signature, queryErr := common.Gorm.Signature.Where(common.Gorm.Signature.ID.Eq(signatureId)).First()
+// GetById retrieves a signature by ID
+func (r *SignatureRepository) GetById(signatureId string) (*model.Signature, error) {
+	signature, queryErr := r.q.Signature.Where(r.q.Signature.ID.Eq(signatureId)).First()
 
 	if queryErr != nil {
 		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
@@ -42,9 +58,10 @@ func GetById(signatureId string) (*model.Signature, error) {
 	return signature, nil
 }
 
-func GetByCertificateAndSignerId(certificateId string, signerId string) (*model.Signature, error) {
+// GetByCertificateAndSignerId retrieves a signature by certificate ID and signer ID
+func (r *SignatureRepository) GetByCertificateAndSignerId(certificateId string, signerId string) (*model.Signature, error) {
 	slog.Info("Requesting signature", "certId", certificateId, "signerId", signerId)
-	signature, queryErr := common.Gorm.Signature.Where(common.Gorm.Signature.CertificateID.Eq(certificateId)).Where(common.Gorm.Signature.SignerID.Eq(signerId)).First()
+	signature, queryErr := r.q.Signature.Where(r.q.Signature.CertificateID.Eq(certificateId)).Where(r.q.Signature.SignerID.Eq(signerId)).First()
 
 	if queryErr != nil {
 		if errors.Is(queryErr, gorm.ErrRecordNotFound) {
@@ -58,10 +75,10 @@ func GetByCertificateAndSignerId(certificateId string, signerId string) (*model.
 }
 
 // UpdateSignature updates an existing signature with encrypted signature image
-func UpdateSignature(signatureId string, encryptedSignature string) (*model.Signature, error) {
+func (r *SignatureRepository) UpdateSignature(signatureId string, encryptedSignature string) (*model.Signature, error) {
 	// Update the signature with encrypted data and mark as signed
-	_, err := common.Gorm.Signature.Where(
-		common.Gorm.Signature.ID.Eq(signatureId),
+	_, err := r.q.Signature.Where(
+		r.q.Signature.ID.Eq(signatureId),
 	).Updates(map[string]interface{}{
 		"signature": encryptedSignature,
 		"is_signed": true,
@@ -73,8 +90,8 @@ func UpdateSignature(signatureId string, encryptedSignature string) (*model.Sign
 	}
 
 	// Fetch and return the updated signature
-	updatedSignature, err := common.Gorm.Signature.Where(
-		common.Gorm.Signature.ID.Eq(signatureId),
+	updatedSignature, err := r.q.Signature.Where(
+		r.q.Signature.ID.Eq(signatureId),
 	).First()
 
 	if err != nil {
@@ -86,11 +103,11 @@ func UpdateSignature(signatureId string, encryptedSignature string) (*model.Sign
 }
 
 // MarkAsRequested marks a signature as requested and updates the last request timestamp
-func MarkAsRequested(certificateId, signerId string) error {
-	_, err := common.Gorm.Signature.Where(
-		common.Gorm.Signature.CertificateID.Eq(certificateId),
+func (r *SignatureRepository) MarkAsRequested(certificateId, signerId string) error {
+	_, err := r.q.Signature.Where(
+		r.q.Signature.CertificateID.Eq(certificateId),
 	).Where(
-		common.Gorm.Signature.SignerID.Eq(signerId),
+		r.q.Signature.SignerID.Eq(signerId),
 	).Updates(map[string]interface{}{
 		"is_requested": true,
 		"last_request": time.Now(),
@@ -104,9 +121,10 @@ func MarkAsRequested(certificateId, signerId string) error {
 	return nil
 }
 
-func UpdateAfterRequestResign(signatureId string) error {
-	_, err := common.Gorm.Signature.Where(
-		common.Gorm.Signature.ID.Eq(signatureId),
+// UpdateAfterRequestResign updates signature after requesting a re-signature
+func (r *SignatureRepository) UpdateAfterRequestResign(signatureId string) error {
+	_, err := r.q.Signature.Where(
+		r.q.Signature.ID.Eq(signatureId),
 	).Updates(map[string]any{
 		"is_requested": true,
 		"is_signed":    false,
@@ -123,16 +141,16 @@ func UpdateAfterRequestResign(signatureId string) error {
 
 // BulkCreateSignatures creates signature records for multiple signers for a certificate
 // Skips signers that already have signatures for this certificate
-func BulkCreateSignatures(certificateId string, signerIds []string, userId string) error {
+func (r *SignatureRepository) BulkCreateSignatures(certificateId string, signerIds []string, userId string) error {
 	if len(signerIds) == 0 {
 		return nil
 	}
 
 	// Check for existing signatures to avoid duplicates
-	existingSignatures, queryErr := common.Gorm.Signature.Where(
-		common.Gorm.Signature.CertificateID.Eq(certificateId),
+	existingSignatures, queryErr := r.q.Signature.Where(
+		r.q.Signature.CertificateID.Eq(certificateId),
 	).Where(
-		common.Gorm.Signature.SignerID.In(signerIds...),
+		r.q.Signature.SignerID.In(signerIds...),
 	).Find()
 
 	if queryErr != nil && !errors.Is(queryErr, gorm.ErrRecordNotFound) {
@@ -160,7 +178,7 @@ func BulkCreateSignatures(certificateId string, signerIds []string, userId strin
 
 	// Create all new signatures in bulk
 	if len(newSignatures) > 0 {
-		createErr := common.Gorm.Signature.Create(newSignatures...)
+		createErr := r.q.Signature.Create(newSignatures...)
 		if createErr != nil {
 			slog.Error("BulkCreateSignatures: Error creating signatures", "error", createErr, "certificateId", certificateId, "count", len(newSignatures))
 			return createErr
@@ -175,15 +193,15 @@ func BulkCreateSignatures(certificateId string, signerIds []string, userId strin
 
 // GetPendingSignaturesForReminder returns signatures that need reminder emails
 // (requested but not signed, and last request was more than 24 hours ago)
-func GetPendingSignaturesForReminder() ([]*model.Signature, error) {
+func (r *SignatureRepository) GetPendingSignaturesForReminder() ([]*model.Signature, error) {
 	twentyFourHoursAgo := time.Now().Add(-24 * time.Hour)
 
-	signatures, queryErr := common.Gorm.Signature.Where(
-		common.Gorm.Signature.IsRequested.Is(true),
+	signatures, queryErr := r.q.Signature.Where(
+		r.q.Signature.IsRequested.Is(true),
 	).Where(
-		common.Gorm.Signature.IsSigned.Is(false),
+		r.q.Signature.IsSigned.Is(false),
 	).Where(
-		common.Gorm.Signature.LastRequest.Lt(twentyFourHoursAgo),
+		r.q.Signature.LastRequest.Lt(twentyFourHoursAgo),
 	).Find()
 
 	if queryErr != nil {
@@ -198,9 +216,9 @@ func GetPendingSignaturesForReminder() ([]*model.Signature, error) {
 }
 
 // GetSignaturesByCertificate returns all signatures for a specific certificate
-func GetSignaturesByCertificate(certificateId string) ([]*model.Signature, error) {
-	signatures, queryErr := common.Gorm.Signature.Where(
-		common.Gorm.Signature.CertificateID.Eq(certificateId),
+func (r *SignatureRepository) GetSignaturesByCertificate(certificateId string) ([]*model.Signature, error) {
+	signatures, queryErr := r.q.Signature.Where(
+		r.q.Signature.CertificateID.Eq(certificateId),
 	).Find()
 
 	if queryErr != nil {
@@ -215,11 +233,11 @@ func GetSignaturesByCertificate(certificateId string) ([]*model.Signature, error
 }
 
 // DeleteSignature deletes a specific signature by certificate ID and signer ID
-func DeleteSignature(certificateId, signerId string) error {
-	result, err := common.Gorm.Signature.Where(
-		common.Gorm.Signature.CertificateID.Eq(certificateId),
+func (r *SignatureRepository) DeleteSignature(certificateId, signerId string) error {
+	result, err := r.q.Signature.Where(
+		r.q.Signature.CertificateID.Eq(certificateId),
 	).Where(
-		common.Gorm.Signature.SignerID.Eq(signerId),
+		r.q.Signature.SignerID.Eq(signerId),
 	).Delete()
 
 	if err != nil {
@@ -232,10 +250,10 @@ func DeleteSignature(certificateId, signerId string) error {
 }
 
 // DeleteSignaturesByCertificate deletes all signatures for a specific certificate
-func DeleteSignaturesByCertificate(certificateId string) ([]*model.Signature, error) {
+func (r *SignatureRepository) DeleteSignaturesByCertificate(certificateId string) ([]*model.Signature, error) {
 	// First, get all signatures for this certificate so we can return them
-	signatures, queryErr := common.Gorm.Signature.Where(
-		common.Gorm.Signature.CertificateID.Eq(certificateId),
+	signatures, queryErr := r.q.Signature.Where(
+		r.q.Signature.CertificateID.Eq(certificateId),
 	).Find()
 
 	if queryErr != nil {
@@ -247,8 +265,8 @@ func DeleteSignaturesByCertificate(certificateId string) ([]*model.Signature, er
 	}
 
 	// Delete all signatures for this certificate
-	result, err := common.Gorm.Signature.Where(
-		common.Gorm.Signature.CertificateID.Eq(certificateId),
+	result, err := r.q.Signature.Where(
+		r.q.Signature.CertificateID.Eq(certificateId),
 	).Delete()
 
 	if err != nil {
@@ -261,9 +279,9 @@ func DeleteSignaturesByCertificate(certificateId string) ([]*model.Signature, er
 }
 
 // AreAllSignaturesComplete checks if all signatures for a certificate are signed
-func AreAllSignaturesComplete(certificateId string) (bool, error) {
+func (r *SignatureRepository) AreAllSignaturesComplete(certificateId string) (bool, error) {
 	// Get all signatures for the certificate
-	signatures, err := GetSignaturesByCertificate(certificateId)
+	signatures, err := r.GetSignaturesByCertificate(certificateId)
 	if err != nil {
 		slog.Error("AreAllSignaturesComplete: Error fetching signatures", "error", err, "certificateId", certificateId)
 		return false, err

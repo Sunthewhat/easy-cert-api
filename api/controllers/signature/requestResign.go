@@ -4,31 +4,26 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
-	"github.com/sunthewhat/easy-cert-api/common"
-	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
-	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func RequestResign(c *fiber.Ctx) error {
+func (ctrl *SignatureController) RequestResign(c *fiber.Ctx) error {
 	signatureId := c.Params("signatureId")
 
-	signature, err := signaturemodel.GetById(signatureId)
+	signature, err := ctrl.signatureRepo.GetById(signatureId)
 
 	if err != nil {
 		return response.SendInternalError(c, err)
 	}
 
-	signer, err := signermodel.GetById(signature.SignerID)
+	signer, err := ctrl.signerRepo.GetById(signature.SignerID)
 
 	if err != nil {
 		return response.SendInternalError(c, err)
 	}
 
-	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
-	cert, err := certRepo.GetById(signature.CertificateID)
+	cert, err := ctrl.certificateRepo.GetById(signature.CertificateID)
 
 	if err != nil {
 		return response.SendInternalError(c, err)
@@ -41,7 +36,7 @@ func RequestResign(c *fiber.Ctx) error {
 		return response.SendInternalError(c, err)
 	}
 
-	err = signaturemodel.UpdateAfterRequestResign(signatureId)
+	err = ctrl.signatureRepo.UpdateAfterRequestResign(signatureId)
 
 	if err != nil {
 		return response.SendInternalError(c, err)

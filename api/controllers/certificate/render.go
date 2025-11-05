@@ -11,7 +11,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
-	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/internal/renderer"
@@ -67,7 +66,7 @@ func (ctrl *CertificateController) Render(c *fiber.Ctx) error {
 	}
 
 	// Get all signatures for this certificate
-	signatures, sigErr := signaturemodel.GetSignaturesByCertificate(certId)
+	signatures, sigErr := ctrl.signatureRepo.GetSignaturesByCertificate(certId)
 	if sigErr != nil {
 		slog.Error("Certificate Render GetSignaturesByCertificate failed", "error", sigErr, "cert_id", certId)
 		return response.SendInternalError(c, sigErr)

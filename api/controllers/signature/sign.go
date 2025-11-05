@@ -9,16 +9,14 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
-	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/internal/renderer"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func Sign(c *fiber.Ctx) error {
+func (ctrl *SignatureController) Sign(c *fiber.Ctx) error {
 	// 1. Get signature ID from URL params
 	signatureId := c.Params("id")
 	if signatureId == "" {
@@ -60,13 +58,13 @@ func Sign(c *fiber.Ctx) error {
 	}
 
 	// 6. Update the signature record with encrypted data and mark as signed
-	updatedSignature, err := signaturemodel.UpdateSignature(signatureId, encryptedSignature)
+	updatedSignature, err := ctrl.signatureRepo.UpdateSignature(signatureId, encryptedSignature)
 	if err != nil {
 		return response.SendInternalError(c, err)
 	}
 
 	// 7. Check if all signatures are complete for this certificate
-	allComplete, checkErr := signaturemodel.AreAllSignaturesComplete(updatedSignature.CertificateID)
+	allComplete, checkErr := ctrl.signatureRepo.AreAllSignaturesComplete(updatedSignature.CertificateID)
 	if checkErr != nil {
 		slog.Error("Failed to check if all signatures complete", "error", checkErr, "certificateId", updatedSignature.CertificateID)
 		// Don't fail the request - signature was uploaded successfully
@@ -74,13 +72,12 @@ func Sign(c *fiber.Ctx) error {
 
 	// 8. If all signatures are complete, mark certificate as signed and notify owner
 	if allComplete {
-		certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
-		certificate, certErr := certRepo.GetById(updatedSignature.CertificateID)
+		certificate, certErr := ctrl.certificateRepo.GetById(updatedSignature.CertificateID)
 		if certErr != nil {
 			slog.Error("Failed to get certificate for notification", "error", certErr, "certificateId", updatedSignature.CertificateID)
 		} else if certificate != nil {
 			// Mark certificate as fully signed
-			markErr := certRepo.MarkAsSigned(certificate.ID)
+			markErr := ctrl.certificateRepo.MarkAsSigned(certificate.ID)
 			if markErr != nil {
 				slog.Error("Failed to mark certificate as signed", "error", markErr, "certificateId", certificate.ID)
 				// Don't fail the request - signature was uploaded successfully
@@ -101,7 +98,7 @@ func Sign(c *fiber.Ctx) error {
 				}
 
 				// Get all signatures and decrypt them
-				allSignatures, sigErr := signaturemodel.GetSignaturesByCertificate(certificate.ID)
+				allSignatures, sigErr := ctrl.signatureRepo.GetSignaturesByCertificate(certificate.ID)
 				if sigErr != nil {
 					return sigErr
 				}

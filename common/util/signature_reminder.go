@@ -42,8 +42,12 @@ func SendSignatureReminders() {
 	startTime := time.Now()
 	slog.Info("SendSignatureReminders: Starting reminder process")
 
+	signatureRepo := signaturemodel.NewSignatureRepository(common.Gorm)
+	signerRepo := signermodel.NewSignerRepository(common.Gorm)
+	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
+
 	// Get pending signatures
-	pendingSignatures, err := signaturemodel.GetPendingSignaturesForReminder()
+	pendingSignatures, err := signatureRepo.GetPendingSignaturesForReminder()
 	if err != nil {
 		slog.Error("SendSignatureReminders: Failed to get pending signatures", "error", err)
 		return
@@ -59,7 +63,7 @@ func SendSignatureReminders() {
 
 	for _, signature := range pendingSignatures {
 		// Get signer details
-		signer, err := signermodel.GetById(signature.SignerID)
+		signer, err := signerRepo.GetById(signature.SignerID)
 		if err != nil {
 			slog.Error("SendSignatureReminders: Error getting signer", "error", err, "signerId", signature.SignerID)
 			failedCount++
@@ -73,7 +77,6 @@ func SendSignatureReminders() {
 		}
 
 		// Get certificate details
-		certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
 		certificate, err := certRepo.GetById(signature.CertificateID)
 		if err != nil {
 			slog.Error("SendSignatureReminders: Error getting certificate", "error", err, "certificateId", signature.CertificateID)
@@ -96,7 +99,7 @@ func SendSignatureReminders() {
 		}
 
 		// Update last_request timestamp
-		markErr := signaturemodel.MarkAsRequested(certificate.ID, signature.SignerID)
+		markErr := signatureRepo.MarkAsRequested(certificate.ID, signature.SignerID)
 		if markErr != nil {
 			slog.Warn("SendSignatureReminders: Failed to update last_request", "error", markErr, "signerId", signature.SignerID)
 		}

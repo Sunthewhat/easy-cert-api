@@ -5,10 +5,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
-	"github.com/sunthewhat/easy-cert-api/common"
-	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
-	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
@@ -20,7 +16,7 @@ type signatureWithSignerData struct {
 	DisplayName string `json:"display_name"`
 }
 
-func GetStatus(c *fiber.Ctx) error {
+func (ctrl *SignerController) GetStatus(c *fiber.Ctx) error {
 	userId, success := middleware.GetUserFromContext(c)
 
 	if !success {
@@ -30,8 +26,7 @@ func GetStatus(c *fiber.Ctx) error {
 
 	certId := c.Params("certId")
 
-	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
-	cert, err := certRepo.GetById(certId)
+	cert, err := ctrl.certificateRepo.GetById(certId)
 
 	if err != nil {
 		return response.SendInternalError(c, err)
@@ -42,7 +37,7 @@ func GetStatus(c *fiber.Ctx) error {
 		return response.SendUnauthorized(c, "You did not own this certificate")
 	}
 
-	signatures, err := signaturemodel.GetSignaturesByCertificate(certId)
+	signatures, err := ctrl.signatureRepo.GetSignaturesByCertificate(certId)
 
 	if err != nil {
 		return response.SendInternalError(c, err)
@@ -51,7 +46,7 @@ func GetStatus(c *fiber.Ctx) error {
 	var signatureDataResponse []*signatureWithSignerData
 
 	for _, sig := range signatures {
-		signer, err := signermodel.GetById(sig.SignerID)
+		signer, err := ctrl.signerRepo.GetById(sig.SignerID)
 		if err != nil {
 			slog.Error("Failed to get signer data from signature")
 		} else {

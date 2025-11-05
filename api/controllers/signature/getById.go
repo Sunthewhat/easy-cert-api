@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 )
 
 type SignatureResponseDTO struct {
@@ -18,7 +17,7 @@ type SignatureResponseDTO struct {
 	LastRequest   string `json:"last_request"`
 }
 
-func GetById(c *fiber.Ctx) error {
+func (ctrl *SignatureController) GetById(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	if id == "" {
@@ -27,7 +26,7 @@ func GetById(c *fiber.Ctx) error {
 		})
 	}
 
-	signature, err := signaturemodel.GetById(id)
+	signature, err := ctrl.signatureRepo.GetById(id)
 	if err != nil {
 		slog.Error("GetById Error", "error", err, "id", id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

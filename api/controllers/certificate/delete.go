@@ -5,7 +5,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
-	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
@@ -37,7 +36,7 @@ func (ctrl *CertificateController) Delete(c *fiber.Ctx) error {
 	}
 
 	// Delete signatures associated with this certificate
-	signatures, err := signaturemodel.DeleteSignaturesByCertificate(certId)
+	signatures, err := ctrl.signatureRepo.DeleteSignaturesByCertificate(certId)
 	if err != nil {
 		slog.Error("Deleting signatures before certificate", "error", err, "certId", certId)
 		return response.SendInternalError(c, err)

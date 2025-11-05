@@ -9,7 +9,7 @@ cors:
 
 jwt_secret: hello
 
-postgres: host=example.com user=db_user password=db_password dbname=db_name port=1234 sslmode=disable connect_timeout=5 TimeZone=Asia/Bangkok
+postgres: host=example.com user=db_user password=db_password dbname=db_name port=1234 sslmode=disable connect_timeout=5
 
 mongo: mongodb://certapp_user:secure_password@localhost:27017/certificate_app
 

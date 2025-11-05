@@ -4,16 +4,18 @@ import (
 	"github.com/gofiber/fiber/v2"
 	certificate_controller "github.com/sunthewhat/easy-cert-api/api/controllers/certificate"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
+	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
 	"github.com/sunthewhat/easy-cert-api/common"
 )
 
 func SetupCertificateRoutes(router fiber.Router) {
-	// Initialize certificate repository
+	// Initialize repositories
 	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
+	signatureRepo := signaturemodel.NewSignatureRepository(common.Gorm)
 
 	// Initialize certificate controller with dependencies
-	certCtrl := certificate_controller.NewCertificateController(certRepo)
+	certCtrl := certificate_controller.NewCertificateController(certRepo, signatureRepo)
 
 	certificateGroup := router.Group("certificate")
 

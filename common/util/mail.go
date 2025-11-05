@@ -474,9 +474,12 @@ func BulkSendSignatureRequests(certificateId, certificateName string, signerIds 
 	var successCount, failedCount int
 	var lastError error
 
+	signerRepo := signermodel.NewSignerRepository(common.Gorm)
+	signatureRepo := signaturemodel.NewSignatureRepository(common.Gorm)
+
 	for _, signerId := range signerIds {
 		// Get signer details
-		signer, err := signermodel.GetById(signerId)
+		signer, err := signerRepo.GetById(signerId)
 		if err != nil {
 			slog.Error("BulkSendSignatureRequests: Error getting signer", "error", err, "signerId", signerId, "certificateId", certificateId)
 			failedCount++
@@ -501,7 +504,7 @@ func BulkSendSignatureRequests(certificateId, certificateName string, signerIds 
 		}
 
 		// Mark signature as requested after successful email send
-		markErr := signaturemodel.MarkAsRequested(certificateId, signerId)
+		markErr := signatureRepo.MarkAsRequested(certificateId, signerId)
 		if markErr != nil {
 			slog.Warn("BulkSendSignatureRequests: Failed to mark as requested", "error", markErr, "signerId", signerId, "certificateId", certificateId)
 			// Don't fail if marking fails - email was sent successfully

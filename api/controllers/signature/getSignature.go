@@ -5,13 +5,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
-	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func GetSignatureImage(c *fiber.Ctx) error {
+func (ctrl *SignatureController) GetSignatureImage(c *fiber.Ctx) error {
 	certificateId := c.Params("certificateId")
 	signerId := c.Params("signerId")
 
@@ -22,7 +21,7 @@ func GetSignatureImage(c *fiber.Ctx) error {
 		return response.SendError(c, "Failed to read user")
 	}
 
-	signature, err := signaturemodel.GetByCertificateAndSignerId(certificateId, signerId)
+	signature, err := ctrl.signatureRepo.GetByCertificateAndSignerId(certificateId, signerId)
 
 	if err != nil {
 		return response.SendInternalError(c, err)

@@ -5,11 +5,10 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
-	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func GetByUser(c *fiber.Ctx) error {
+func (ctrl *SignerController) GetByUser(c *fiber.Ctx) error {
 	userId, success := middleware.GetUserFromContext(c)
 
 	if !success {
@@ -17,7 +16,7 @@ func GetByUser(c *fiber.Ctx) error {
 		return response.SendUnauthorized(c, "User context failed")
 	}
 
-	signers, err := signermodel.GetByUser(userId)
+	signers, err := ctrl.signerRepo.GetByUser(userId)
 
 	if err != nil {
 		return response.SendInternalError(c, err)

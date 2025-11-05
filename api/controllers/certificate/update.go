@@ -8,7 +8,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
-	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -122,7 +121,7 @@ func (ctrl *CertificateController) Update(c *fiber.Ctx) error {
 			slog.Warn("Certificate Update: Failed to extract signer IDs from design", "error", extractErr, "cert_id", id)
 		} else {
 			// Get existing signatures for this certificate
-			existingSignatures, getErr := signaturemodel.GetSignaturesByCertificate(id)
+			existingSignatures, getErr := ctrl.signatureRepo.GetSignaturesByCertificate(id)
 			if getErr != nil {
 				slog.Warn("Certificate Update: Failed to get existing signatures", "error", getErr, "cert_id", id)
 			} else {
@@ -145,7 +144,7 @@ func (ctrl *CertificateController) Update(c *fiber.Ctx) error {
 				// Add new signatures for newly added SIGNATURE objects
 				if len(addedSignerIds) > 0 && userStatus {
 					slog.Info("Certificate Update: Adding new signatures", "cert_id", id, "count", len(addedSignerIds), "signerIds", addedSignerIds)
-					createErr := signaturemodel.BulkCreateSignatures(id, addedSignerIds, userId)
+					createErr := ctrl.signatureRepo.BulkCreateSignatures(id, addedSignerIds, userId)
 					if createErr != nil {
 						slog.Warn("Certificate Update: Failed to create new signatures", "error", createErr, "cert_id", id)
 					} else {
@@ -167,14 +166,14 @@ func (ctrl *CertificateController) Update(c *fiber.Ctx) error {
 				if len(removedSignerIds) > 0 {
 					slog.Info("Certificate Update: Removing deleted signatures", "cert_id", id, "count", len(removedSignerIds), "signerIds", removedSignerIds)
 					for _, signerId := range removedSignerIds {
-						deleteErr := signaturemodel.DeleteSignature(id, signerId)
+						deleteErr := ctrl.signatureRepo.DeleteSignature(id, signerId)
 						if deleteErr != nil {
 							slog.Warn("Certificate Update: Failed to delete signature", "error", deleteErr, "cert_id", id, "signerId", signerId)
 						}
 					}
 
 					// After removing signatures, check if all remaining signatures are complete
-					allComplete, checkErr := signaturemodel.AreAllSignaturesComplete(id)
+					allComplete, checkErr := ctrl.signatureRepo.AreAllSignaturesComplete(id)
 					if checkErr != nil {
 						slog.Warn("Certificate Update: Failed to check if all signatures complete", "error", checkErr, "cert_id", id)
 					} else if allComplete {

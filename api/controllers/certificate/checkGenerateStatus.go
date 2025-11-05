@@ -5,7 +5,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
-	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
@@ -33,7 +32,7 @@ func (ctrl *CertificateController) CheckGenerateStatus(c *fiber.Ctx) error {
 	returnResponse := new(responseStruct)
 
 	if !cert.IsSigned {
-		notHaveSignature, err := signaturemodel.AreAllSignaturesComplete(certificateId)
+		notHaveSignature, err := ctrl.signatureRepo.AreAllSignaturesComplete(certificateId)
 		if err != nil {
 			return response.SendInternalError(c, err)
 		}
