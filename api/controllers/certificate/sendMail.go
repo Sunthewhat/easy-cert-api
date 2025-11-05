@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
@@ -28,7 +27,7 @@ func (ctrl *CertificateController) DistributeByMail(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Certificate not exist")
 	}
 
-	participants, err := participantmodel.GetParticipantsByCertId(certId)
+	participants, err := ctrl.participantRepo.GetParticipantsByCertId(certId)
 	if err != nil {
 		slog.Error("Distribute By Mail Get participant by certId Error", "error", err)
 		return response.SendInternalError(c, err)
@@ -60,7 +59,7 @@ func (ctrl *CertificateController) DistributeByMail(c *fiber.Ctx) error {
 			failedResults = append(failedResults, participantInfo)
 			slog.Error("Attempt to send mail without certificate url", "certId", certId, "participantId", participant.ID)
 			// Update email status to failed
-			participantmodel.UpdateEmailStatus(participant.ID, "failed")
+			ctrl.participantRepo.UpdateEmailStatus(participant.ID, "failed")
 			continue
 		}
 
@@ -74,7 +73,7 @@ func (ctrl *CertificateController) DistributeByMail(c *fiber.Ctx) error {
 				"participantId", participant.ID,
 				"emailField", emailField)
 			// Update email status to failed
-			participantmodel.UpdateEmailStatus(participant.ID, "failed")
+			ctrl.participantRepo.UpdateEmailStatus(participant.ID, "failed")
 			continue
 		}
 
@@ -89,7 +88,7 @@ func (ctrl *CertificateController) DistributeByMail(c *fiber.Ctx) error {
 				"emailField", emailField,
 				"emailValue", emailValue)
 			// Update email status to failed
-			participantmodel.UpdateEmailStatus(participant.ID, "failed")
+			ctrl.participantRepo.UpdateEmailStatus(participant.ID, "failed")
 			continue
 		}
 
@@ -100,7 +99,7 @@ func (ctrl *CertificateController) DistributeByMail(c *fiber.Ctx) error {
 				"certId", certId,
 				"participantId", participant.ID)
 			// Update email status to failed
-			participantmodel.UpdateEmailStatus(participant.ID, "failed")
+			ctrl.participantRepo.UpdateEmailStatus(participant.ID, "failed")
 			continue
 		}
 
@@ -116,10 +115,10 @@ func (ctrl *CertificateController) DistributeByMail(c *fiber.Ctx) error {
 				"participantId", participant.ID,
 				"email", email)
 			// Update email status to failed
-			participantmodel.UpdateEmailStatus(participant.ID, "failed")
+			ctrl.participantRepo.UpdateEmailStatus(participant.ID, "failed")
 		} else {
 			// Update email status to success
-			err := participantmodel.UpdateEmailStatus(participant.ID, "success")
+			err := ctrl.participantRepo.UpdateEmailStatus(participant.ID, "success")
 			if err != nil {
 				slog.Warn("Failed to update email status to success",
 					"error", err,
@@ -149,7 +148,7 @@ func (ctrl *CertificateController) DistributeByMail(c *fiber.Ctx) error {
 }
 
 // ResendParticipantMail resends certificate email to a specific participant by their ID
-func ResendParticipantMail(c *fiber.Ctx) error {
+func (ctrl *CertificateController) ResendParticipantMail(c *fiber.Ctx) error {
 	participantId := c.Params("participantId")
 
 	if participantId == "" {
@@ -157,7 +156,7 @@ func ResendParticipantMail(c *fiber.Ctx) error {
 	}
 
 	// Get participant by ID
-	participant, err := participantmodel.GetParticipantsById(participantId)
+	participant, err := ctrl.participantRepo.GetParticipantsById(participantId)
 	if err != nil {
 		slog.Error("Resend Participant Mail: Error getting participant", "error", err, "participantId", participantId)
 		return response.SendInternalError(c, err)
@@ -171,7 +170,7 @@ func ResendParticipantMail(c *fiber.Ctx) error {
 	// Check if certificate URL exists
 	if participant.CertificateURL == "" {
 		slog.Error("Resend Participant Mail: Certificate URL not found", "participantId", participantId)
-		participantmodel.UpdateEmailStatus(participantId, "failed")
+		ctrl.participantRepo.UpdateEmailStatus(participantId, "failed")
 		return response.SendFailed(c, "Certificate URL not found for this participant")
 	}
 
@@ -180,7 +179,7 @@ func ResendParticipantMail(c *fiber.Ctx) error {
 	if !exists {
 		slog.Warn("Resend Participant Mail: Email field not found in participant data",
 			"participantId", participantId)
-		participantmodel.UpdateEmailStatus(participantId, "failed")
+		ctrl.participantRepo.UpdateEmailStatus(participantId, "failed")
 		return response.SendFailed(c, "Email field not found in participant data")
 	}
 
@@ -190,13 +189,13 @@ func ResendParticipantMail(c *fiber.Ctx) error {
 		slog.Warn("Resend Participant Mail: Email field is not a string",
 			"participantId", participantId,
 			"emailValue", emailValue)
-		participantmodel.UpdateEmailStatus(participantId, "failed")
+		ctrl.participantRepo.UpdateEmailStatus(participantId, "failed")
 		return response.SendFailed(c, "Email field is not a valid string")
 	}
 
 	if email == "" {
 		slog.Warn("Resend Participant Mail: Empty email address", "participantId", participantId)
-		participantmodel.UpdateEmailStatus(participantId, "failed")
+		ctrl.participantRepo.UpdateEmailStatus(participantId, "failed")
 		return response.SendFailed(c, "Empty email address")
 	}
 
@@ -207,12 +206,12 @@ func ResendParticipantMail(c *fiber.Ctx) error {
 			"error", err,
 			"participantId", participantId,
 			"email", email)
-		participantmodel.UpdateEmailStatus(participantId, "failed")
+		ctrl.participantRepo.UpdateEmailStatus(participantId, "failed")
 		return response.SendError(c, "Failed to send email: "+err.Error())
 	}
 
 	// Update email status to success
-	err = participantmodel.UpdateEmailStatus(participantId, "success")
+	err = ctrl.participantRepo.UpdateEmailStatus(participantId, "success")
 	if err != nil {
 		slog.Warn("Resend Participant Mail: Failed to update email status",
 			"error", err,

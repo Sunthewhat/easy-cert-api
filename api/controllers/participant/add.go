@@ -5,15 +5,12 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
-	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
-	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func Add(c *fiber.Ctx) error {
+func (ctrl *ParticipantController) Add(c *fiber.Ctx) error {
 	certId := c.Params("certId")
 
 	if certId == "" {
@@ -22,8 +19,7 @@ func Add(c *fiber.Ctx) error {
 	}
 
 	// First verify that the certificate exists
-	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
-	cert, err := certRepo.GetById(certId)
+	cert, err := ctrl.certificateRepo.GetById(certId)
 	if err != nil {
 		slog.Error("Participant Add certificate verification failed", "error", err, "cert_id", certId)
 		return response.SendInternalError(c, err)
@@ -50,7 +46,7 @@ func Add(c *fiber.Ctx) error {
 	// Note: Field validation against certificate design anchors is now handled in the model layer
 
 	// Check if collection already exists and has documents
-	count, countErr := participantmodel.GetParticipantCollectionCount(certId)
+	count, countErr := ctrl.participantRepo.GetParticipantCollectionCount(certId)
 	if countErr != nil {
 		slog.Error("Participant Add collection count failed", "error", countErr, "cert_id", certId)
 		return response.SendInternalError(c, countErr)
@@ -64,7 +60,7 @@ func Add(c *fiber.Ctx) error {
 	}
 
 	// Add participants using model function
-	result, addErr := participantmodel.AddParticipants(certId, body.Participants)
+	result, addErr := ctrl.participantRepo.AddParticipants(certId, body.Participants)
 	if addErr != nil {
 		slog.Error("Participant Add failed", "error", addErr, "cert_id", certId)
 		return response.SendInternalError(c, addErr)

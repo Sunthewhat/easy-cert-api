@@ -7,7 +7,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
-	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -105,7 +104,7 @@ func (ctrl *CertificateController) Update(c *fiber.Ctx) error {
 
 	// If design was updated, clean up deleted anchors from participants
 	if body.Design != "" {
-		cleanupErr := participantmodel.CleanupDeletedAnchors(id, updatedCert.Design)
+		cleanupErr := ctrl.participantRepo.CleanupDeletedAnchors(id, updatedCert.Design)
 		if cleanupErr != nil {
 			slog.Warn("Failed to cleanup deleted anchors from participants", "error", cleanupErr, "cert_id", id)
 			// Don't fail the update operation if cleanup fails, just log it

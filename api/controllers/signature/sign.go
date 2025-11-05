@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/common"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/internal/renderer"
@@ -87,7 +86,7 @@ func (ctrl *SignatureController) Sign(c *fiber.Ctx) error {
 			previewPath := ""
 			previewErr := func() error {
 				// Get all participants
-				participants, partErr := participantmodel.GetParticipantsByCertId(certificate.ID)
+				participants, partErr := ctrl.participantRepo.GetParticipantsByCertId(certificate.ID)
 				if partErr != nil {
 					return partErr
 				}

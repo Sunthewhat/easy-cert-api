@@ -4,11 +4,10 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func Revoke(c *fiber.Ctx) error {
+func (ctrl *ParticipantController) Revoke(c *fiber.Ctx) error {
 	// Get participant ID from URL parameter
 	id := c.Params("id")
 	if id == "" {
@@ -16,7 +15,7 @@ func Revoke(c *fiber.Ctx) error {
 	}
 
 	// Revoke the participant
-	revokedParticipant, err := participantmodel.Revoke(id)
+	revokedParticipant, err := ctrl.participantRepo.Revoke(id)
 	if err != nil {
 		slog.Error("Participant Revoke controller", "error", err)
 		return response.SendFailed(c, "Participant not found or already revoked")

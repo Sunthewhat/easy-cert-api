@@ -24,8 +24,11 @@ func PublicDownloadCertificate(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Participant ID is required")
 	}
 
+	// Create repository instance for participant operations
+	participantRepo := participantmodel.NewParticipantRepository(common.Gorm, common.Mongo)
+
 	// Get participant data to validate and get certificate URL
-	participant, err := participantmodel.GetParticipantsById(participantId)
+	participant, err := participantRepo.GetParticipantsById(participantId)
 	if err != nil {
 		slog.Warn("Public certificate download: participant not found", "participant_id", participantId)
 		return response.SendError(c, "Certificate not found")
@@ -125,7 +128,7 @@ func PublicDownloadCertificate(c *fiber.Ctx) error {
 
 	// Mark as downloaded if this is the first download
 	if !participant.IsDownloaded {
-		err := participantmodel.MarkAsDownloaded(participantId)
+		err := participantRepo.MarkAsDownloaded(participantId)
 		if err != nil {
 			slog.Warn("Failed to mark participant as downloaded",
 				"error", err,

@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/gofiber/fiber/v2"
-	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/common/util"
 	"github.com/sunthewhat/easy-cert-api/type/payload"
 	"github.com/sunthewhat/easy-cert-api/type/response"
@@ -16,7 +15,7 @@ type EditParticipantPayload struct {
 	Data map[string]any `json:"data" validate:"required"`
 }
 
-func EditByID(c *fiber.Ctx) error {
+func (ctrl *ParticipantController) EditByID(c *fiber.Ctx) error {
 	participantId := c.Params("id")
 
 	var payload EditParticipantPayload
@@ -30,7 +29,7 @@ func EditByID(c *fiber.Ctx) error {
 		return response.SendFailed(c, fmt.Sprintf("Invalid Data type %s", util.GetValidationErrors(err)[0]))
 	}
 
-	updatedParticipant, err := participantmodel.EditParticipantByID(participantId, payload.Data)
+	updatedParticipant, err := ctrl.participantRepo.EditParticipantByID(participantId, payload.Data)
 	if err != nil {
 		slog.Error("EditParticipant: Failed to update participant", "error", err, "participant_id", participantId)
 		return response.SendInternalError(c, err)
@@ -41,7 +40,7 @@ func EditByID(c *fiber.Ctx) error {
 	return response.SendSuccess(c, "Participant updated successfully", updatedParticipant)
 }
 
-func UpdateIsDistribute(c *fiber.Ctx) error {
+func (ctrl *ParticipantController) UpdateIsDistribute(c *fiber.Ctx) error {
 	var payload payload.UpdateParticipantIsDistributed
 	if err := c.BodyParser(&payload); err != nil {
 		slog.Warn("Update Is Distributed failed to parse body", "error", err)
@@ -79,7 +78,7 @@ func UpdateIsDistribute(c *fiber.Ctx) error {
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			err := participantmodel.UpdateDownloadStatus(id, true)
+			err := ctrl.participantRepo.UpdateDownloadStatus(id, true)
 
 			// Thread-safe result storage
 			mu.Lock()

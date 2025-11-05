@@ -5,6 +5,7 @@ import (
 	signature_controller "github.com/sunthewhat/easy-cert-api/api/controllers/signature"
 	"github.com/sunthewhat/easy-cert-api/api/middleware"
 	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
+	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	signaturemodel "github.com/sunthewhat/easy-cert-api/api/model/signatureModel"
 	signermodel "github.com/sunthewhat/easy-cert-api/api/model/signerModel"
 	"github.com/sunthewhat/easy-cert-api/common"
@@ -15,9 +16,10 @@ func SetupSignatureRoutes(router fiber.Router) {
 	signatureRepo := signaturemodel.NewSignatureRepository(common.Gorm)
 	certificateRepo := certificatemodel.NewCertificateRepository(common.Gorm)
 	signerRepo := signermodel.NewSignerRepository(common.Gorm)
+	participantRepo := participantmodel.NewParticipantRepository(common.Gorm, common.Mongo)
 
 	// Initialize controller with repositories
-	signatureCtrl := signature_controller.NewSignatureController(signatureRepo, certificateRepo, signerRepo)
+	signatureCtrl := signature_controller.NewSignatureController(signatureRepo, certificateRepo, signerRepo, participantRepo)
 
 	signatureGroup := router.Group("signature")
 

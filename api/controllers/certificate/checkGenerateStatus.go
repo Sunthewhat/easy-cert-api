@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
@@ -57,7 +56,7 @@ func (ctrl *CertificateController) CheckGenerateStatus(c *fiber.Ctx) error {
 		return response.SendSuccess(c, "Certificate is not distributed", returnResponse)
 	}
 
-	participants, err := participantmodel.GetParticipantsByCertId(cert.ID)
+	participants, err := ctrl.participantRepo.GetParticipantsByCertId(cert.ID)
 
 	if err != nil {
 		slog.Error("Error getting participants by certificate id in CheckDistributeStatus", "error", err, "certificateId", certificateId)

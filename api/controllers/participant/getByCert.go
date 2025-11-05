@@ -1,16 +1,14 @@
 package participant_controller
 
 import (
-	"github.com/sunthewhat/easy-cert-api/common"
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	certificatemodel "github.com/sunthewhat/easy-cert-api/api/model/certificateModel"
 	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
-func GetByCert(c *fiber.Ctx) error {
+func (ctrl *ParticipantController) GetByCert(c *fiber.Ctx) error {
 	certId := c.Params("certId")
 
 	if certId == "" {
@@ -18,8 +16,7 @@ func GetByCert(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Certificate ID is required")
 	}
 
-	certRepo := certificatemodel.NewCertificateRepository(common.Gorm)
-	cert, err := certRepo.GetById(certId)
+	cert, err := ctrl.certificateRepo.GetById(certId)
 
 	if err != nil {
 		slog.Error("Get Participant by ID failed", "error", err, "certId", certId)
@@ -31,7 +28,7 @@ func GetByCert(c *fiber.Ctx) error {
 		return response.SendFailed(c, "Certificate not found")
 	}
 
-	participants, err := participantmodel.GetParticipantsByCertId(certId)
+	participants, err := ctrl.participantRepo.GetParticipantsByCertId(certId)
 
 	if err != nil {
 		slog.Error("Get participant Error", "error", err)
@@ -40,7 +37,7 @@ func GetByCert(c *fiber.Ctx) error {
 
 	// Initialize empty slice to avoid returning null
 	if participants == nil {
-		participants = []*participantmodel.CombinedParticipant{}
+		participants = make([]*participantmodel.CombinedParticipant, 0)
 	}
 
 	return response.SendSuccess(c, "Participant Fetched!", participants)

@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	participantmodel "github.com/sunthewhat/easy-cert-api/api/model/participantModel"
 	"github.com/sunthewhat/easy-cert-api/type/response"
 )
 
@@ -29,7 +28,7 @@ func (ctrl *CertificateController) Delete(c *fiber.Ctx) error {
 	}
 
 	// Delete participants first
-	participants, err := participantmodel.DeleteByCertId(certId)
+	participants, err := ctrl.participantRepo.DeleteByCertId(certId)
 	if err != nil {
 		slog.Error("Deleting participant before certificate", "error", err, "certId", certId)
 		return response.SendInternalError(c, err)

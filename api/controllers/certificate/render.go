@@ -59,7 +59,7 @@ func (ctrl *CertificateController) Render(c *fiber.Ctx) error {
 	}
 
 	// Get participants data
-	allParticipants, err := participantmodel.GetParticipantsByCertId(certId)
+	allParticipants, err := ctrl.participantRepo.GetParticipantsByCertId(certId)
 	if err != nil {
 		slog.Error("Certificate Render GetParticipantsByCertId failed", "error", err, "cert_id", certId)
 		return response.SendInternalError(c, err)
@@ -120,7 +120,7 @@ func (ctrl *CertificateController) Render(c *fiber.Ctx) error {
 			participantIds[i] = p.ID
 		}
 
-		err = participantmodel.ResetParticipantStatuses(participantIds)
+		err = ctrl.participantRepo.ResetParticipantStatuses(participantIds)
 		if err != nil {
 			slog.Warn("Certificate Render: Failed to reset participant statuses",
 				"error", err,
@@ -246,7 +246,7 @@ func (ctrl *CertificateController) Render(c *fiber.Ctx) error {
 		if result.Status == "success" && result.FilePath != "" {
 			// Use backend proxy URL instead of direct MinIO URL for security
 			certificateURL := util.GenerateProxyURL(*common.Config.BucketCertificate, result.FilePath)
-			err := participantmodel.UpdateParticipantCertificateUrlInPostgres(result.ParticipantID, certificateURL)
+			err := ctrl.participantRepo.UpdateParticipantCertificateUrl(result.ParticipantID, certificateURL)
 			if err != nil {
 				slog.Warn("Certificate Render failed to update participant certificate URL",
 					"error", err,
@@ -262,7 +262,7 @@ func (ctrl *CertificateController) Render(c *fiber.Ctx) error {
 	}
 
 	// Get updated participants data
-	updatedParticipants, err := participantmodel.GetParticipantsByCertId(certId)
+	updatedParticipants, err := ctrl.participantRepo.GetParticipantsByCertId(certId)
 	if err != nil {
 		slog.Error("Certificate Render failed to get updated participants", "error", err, "cert_id", certId)
 		// Fallback to results if getting updated participants fails
