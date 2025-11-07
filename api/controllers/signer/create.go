@@ -29,13 +29,14 @@ func (ctrl *SignerController) Create(c *fiber.Ctx) error {
 		return response.SendUnauthorized(c, "Invalid token context")
 	}
 
-	isEmailExisted, err := ctrl.signerRepo.IsEmailExisted(body.Email)
+	// Check if email already exists for this creator (not globally)
+	existingSigner, err := ctrl.signerRepo.GetByEmail(body.Email, userId)
 
 	if err != nil {
 		return response.SendInternalError(c, err)
 	}
 
-	if isEmailExisted {
+	if existingSigner != nil {
 		return response.SendFailed(c, "Signer with this email already existed")
 	}
 

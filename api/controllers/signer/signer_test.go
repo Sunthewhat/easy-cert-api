@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"testing"
@@ -209,8 +210,9 @@ func TestSignerController_Create(t *testing.T) {
 			},
 			setupMock: func() *signermodel.MockSignerRepository {
 				mock := signermodel.NewMockSignerRepository()
-				mock.IsEmailExistedFunc = func(email string) (bool, error) {
-					return false, nil
+				// Check email existence for this creator only
+				mock.GetByEmailFunc = func(email string, creatorId string) (*model.Signer, error) {
+					return nil, nil // No existing signer for this creator
 				}
 				mock.CreateFunc = func(signerData payload.CreateSignerPayload, userId string) (*model.Signer, error) {
 					return &model.Signer{
@@ -347,8 +349,8 @@ func TestSignerController_Create(t *testing.T) {
 			},
 			setupMock: func() *signermodel.MockSignerRepository {
 				mock := signermodel.NewMockSignerRepository()
-				mock.IsEmailExistedFunc = func(email string) (bool, error) {
-					return false, errors.New("database connection error")
+				mock.GetByEmailFunc = func(email string, creatorId string) (*model.Signer, error) {
+					return nil, errors.New("database connection error")
 				}
 				return mock
 			},
@@ -364,7 +366,7 @@ func TestSignerController_Create(t *testing.T) {
 			},
 		},
 		{
-			name: "failed - email already exists",
+			name: "failed - email already exists for this creator",
 			requestBody: payload.CreateSignerPayload{
 				Email:       "existing@example.com",
 				DisplayName: "New Signer",
@@ -374,8 +376,14 @@ func TestSignerController_Create(t *testing.T) {
 			},
 			setupMock: func() *signermodel.MockSignerRepository {
 				mock := signermodel.NewMockSignerRepository()
-				mock.IsEmailExistedFunc = func(email string) (bool, error) {
-					return true, nil
+				// Return existing signer for this creator
+				mock.GetByEmailFunc = func(email string, creatorId string) (*model.Signer, error) {
+					return &model.Signer{
+						ID:          "existing-signer-id",
+						Email:       email,
+						DisplayName: "Existing Signer",
+						CreatedBy:   creatorId,
+					}, nil
 				}
 				return mock
 			},
@@ -811,5 +819,111 @@ func TestSignerController_GetStatus(t *testing.T) {
 				tt.checkResponse(t, body)
 			}
 		})
+	}
+}
+
+func TestSignerController_Create_DifferentCreatorsSameEmail(t *testing.T) {
+	// This test verifies that different creators can have signers with the same email
+	mock := signermodel.NewMockSignerRepository()
+
+	// Track signers by creator+email combination
+	signersByCreatorEmail := make(map[string]*model.Signer)
+
+	// Mock GetByEmail to check per-creator
+	mock.GetByEmailFunc = func(email string, creatorId string) (*model.Signer, error) {
+		key := creatorId + "|" + email
+		if signer, exists := signersByCreatorEmail[key]; exists {
+			return signer, nil
+		}
+		return nil, nil
+	}
+
+	mock.CreateFunc = func(signerData payload.CreateSignerPayload, userId string) (*model.Signer, error) {
+		signer := &model.Signer{
+			ID:          fmt.Sprintf("signer-%s", userId),
+			Email:       signerData.Email,
+			DisplayName: signerData.DisplayName,
+			CreatedBy:   userId,
+			CreatedAt:   time.Now(),
+		}
+		key := userId + "|" + signerData.Email
+		signersByCreatorEmail[key] = signer
+		return signer, nil
+	}
+
+	mockSignatureRepo := signaturemodel.NewMockSignatureRepository()
+	mockCertRepo := certificatemodel.NewMockCertificateRepository()
+
+	ctrl := signer_controller.NewSignerController(mock, mockSignatureRepo, mockCertRepo)
+
+	app := fiber.New()
+	app.Post("/signer", func(c *fiber.Ctx) error {
+		// Get creator ID from query parameter
+		creatorId := c.Query("creator_id")
+		// Make a copy of the string to avoid Fiber's internal string reuse between requests
+		userIdCopy := string([]byte(creatorId))
+		c.Locals("user_id", userIdCopy)
+		return ctrl.Create(c)
+	})
+	
+	// Creator 1 creates a signer with email "shared@example.com"
+	payload1 := payload.CreateSignerPayload{
+		Email:       "shared@example.com",
+		DisplayName: "Signer for Creator 1",
+	}
+	bodyBytes1, _ := json.Marshal(payload1)
+	req1 := httptest.NewRequest("POST", "/signer?creator_id=creator1@example.com", bytes.NewBuffer(bodyBytes1))
+	req1.Header.Set("Content-Type", "application/json")
+	
+	resp1, err := app.Test(req1)
+	if err != nil {
+		t.Fatalf("Failed to execute request 1: %v", err)
+	}
+
+	if resp1.StatusCode != fiber.StatusOK {
+		t.Errorf("Expected status code 200 for creator 1, got %d", resp1.StatusCode)
+	}
+	
+	// Creator 2 creates a signer with the SAME email "shared@example.com"
+	payload2 := payload.CreateSignerPayload{
+		Email:       "shared@example.com",
+		DisplayName: "Signer for Creator 2",
+	}
+	bodyBytes2, _ := json.Marshal(payload2)
+	req2 := httptest.NewRequest("POST", "/signer?creator_id=creator2@example.com", bytes.NewBuffer(bodyBytes2))
+	req2.Header.Set("Content-Type", "application/json")
+	
+	resp2, err := app.Test(req2)
+	if err != nil {
+		t.Fatalf("Failed to execute request 2: %v", err)
+	}
+
+	if resp2.StatusCode != fiber.StatusOK {
+		t.Errorf("Expected status code 200 for creator 2, got %d", resp2.StatusCode)
+	}
+	
+	// Verify both signers were created
+	if len(signersByCreatorEmail) != 2 {
+		t.Errorf("Expected 2 signers to be created, got %d", len(signersByCreatorEmail))
+	}
+
+	// Verify both creators have signers with the same email
+	signer1, exists1 := signersByCreatorEmail["creator1@example.com|shared@example.com"]
+	signer2, exists2 := signersByCreatorEmail["creator2@example.com|shared@example.com"]
+
+	if !exists1 || !exists2 {
+		t.Fatal("Both creators should have created signers")
+	}
+
+	if signer1.Email != "shared@example.com" || signer2.Email != "shared@example.com" {
+		t.Errorf("Both signers should have the same email, got %s and %s", signer1.Email, signer2.Email)
+	}
+
+	if signer1.CreatedBy != "creator1@example.com" {
+		t.Errorf("First signer should be created by creator1, got %s", signer1.CreatedBy)
+	}
+
+	if signer2.CreatedBy != "creator2@example.com" {
+		t.Errorf("Second signer should be created by creator2, got %s", signer2.CreatedBy)
 	}
 }
