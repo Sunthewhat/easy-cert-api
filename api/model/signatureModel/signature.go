@@ -287,6 +287,12 @@ func (r *SignatureRepository) AreAllSignaturesComplete(certificateId string) (bo
 		return false, err
 	}
 
+	// If there are no signatures, return false (nothing to complete)
+	if len(signatures) == 0 {
+		slog.Info("No signatures found for certificate", "certificateId", certificateId)
+		return false, nil
+	}
+
 	// Check if all signatures are signed
 	for _, sig := range signatures {
 		if !sig.IsSigned {
