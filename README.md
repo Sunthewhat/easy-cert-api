@@ -1,6 +1,12 @@
 # Easy-Cert API
 Backend API for the Easy-Cert certificate management system, built with Go and Fiber framework.
 
+## Authors
+
+* **Chotiwet Wisitworanut** - 65130500208
+* **Witthawin Klairatsamee** - 65130500243
+* **Thawatchai Wongboonsiri** - 65130500262
+  
 ## Project Framework
 - **Language:** Go 1.23.4
 - **Web Framework:** Fiber v2
