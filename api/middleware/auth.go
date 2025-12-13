@@ -10,7 +10,7 @@ import (
 )
 
 // AuthMiddleware - Complete JWT authentication middleware
-func AuthMiddleware(ssoService util.ISSOService) fiber.Handler {
+func AuthMiddleware(authService util.IAuthService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Get Authorization header
 		authHeader := c.Get("Authorization")
@@ -35,13 +35,13 @@ func AuthMiddleware(ssoService util.ISSOService) fiber.Handler {
 
 		token := tokenParts[1]
 
-		newToken, err := ssoService.Refresh(token)
+		newToken, err := authService.Refresh(token)
 		if err != nil {
 			slog.Error("Refresh token failed", "error", err)
 			return response.SendUnauthorized(c, err.Error())
 		}
 
-		jwtPayload, err := ssoService.Decode(newToken.AccessToken)
+		jwtPayload, err := authService.Decode(newToken.AccessToken)
 		if err != nil {
 			slog.Error("Failed to decode JWT token from refreshed token", "errror", err)
 		}

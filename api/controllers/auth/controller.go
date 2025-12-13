@@ -3,9 +3,9 @@ package auth_controller
 import "github.com/sunthewhat/easy-cert-api/common/util"
 
 type AuthController struct {
-	ssoService util.ISSOService
+	authService util.IAuthService
 }
 
-func NewAuthController(sso util.ISSOService) *AuthController {
-	return &AuthController{ssoService: sso}
+func NewAuthController(authService util.IAuthService) *AuthController {
+	return &AuthController{authService: authService}
 }

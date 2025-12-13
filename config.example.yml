@@ -27,6 +27,8 @@ bucket_resource: bucket_resource
 
 bucket_certificate: bucket_certificate
 
+is_sso_enable: true
+
 sso_issuer_url: http:sso.com
 
 sso_client: client

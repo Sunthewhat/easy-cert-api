@@ -16,9 +16,10 @@ type Config struct {
 	MinIoSecretKey    *string   `yaml:"minio_secret_key" validate:"required"`
 	BucketResource    *string   `yaml:"bucket_resource" validate:"required"`
 	BucketCertificate *string   `yaml:"bucket_certificate" validate:"required"`
-	SsoIssuerUrl      *string   `yaml:"sso_issuer_url" validate:"required"`
-	SsoClient         *string   `yaml:"sso_client" validate:"required"`
-	SsoSecret         *string   `yaml:"sso_secret" validate:"required"`
+	IsSsoEnable       *bool     `yaml:"is_sso_enable" validate:"required"`
+	SsoIssuerUrl      *string   `yaml:"sso_issuer_url"`
+	SsoClient         *string   `yaml:"sso_client"`
+	SsoSecret         *string   `yaml:"sso_secret"`
 	MailHost          *string   `yaml:"mail_host" validate:"required"`
 	MailUser          *string   `yaml:"mail_user" validate:"required"`
 	MailPass          *string   `yaml:"mail_pass" validate:"required"`

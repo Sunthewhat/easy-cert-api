@@ -44,6 +44,7 @@ func Push_db() {
 		new(model.Participant),
 		new(model.Signer),
 		new(model.Signature),
+		new(model.User),
 	); err != nil {
 		slog.Error("Failed to migrate database", "error", err)
 		os.Exit(1)

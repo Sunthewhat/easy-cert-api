@@ -21,22 +21,22 @@ func (ac *AuthController) Login(c *fiber.Ctx) error {
 		return response.SendFailed(c, errors[0]) // Return first validation error
 	}
 
-	ssoResponse, err := ac.ssoService.Login(body.Username, body.Password)
+	authResponse, err := ac.authService.Login(body.Username, body.Password)
 
 	if err != nil {
-		slog.Error("SSO login Failed")
+		slog.Error("Authentication login Failed")
 		return response.SendInternalError(c, err)
 	}
 
 	// Decode the JWT access token
-	jwtPayload, err := ac.ssoService.Decode(ssoResponse.AccessToken)
+	jwtPayload, err := ac.authService.Decode(authResponse.AccessToken)
 	if err != nil {
 		slog.Error("Failed to decode JWT token", "error", err)
 		return response.SendInternalError(c, err)
 	}
 
 	return response.SendSuccess(c, "Login Successfull", fiber.Map{
-		"token":     ssoResponse.RefreshToken,
+		"token":     authResponse.RefreshToken,
 		"firstname": jwtPayload.GivenName,
 		"lastname":  jwtPayload.FamilyName,
 		"username":  jwtPayload.PreferredUsername,

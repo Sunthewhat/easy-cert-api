@@ -21,7 +21,7 @@ type ISSOService interface {
 
 type SSOService struct{}
 
-func NewSSOService() ISSOService {
+func NewSSOService() IAuthService {
 	return &SSOService{}
 }
 
